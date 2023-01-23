@@ -1,7 +1,7 @@
 package nl.w8mr.kasmine
 
-import jogamp.graph.font.typecast.ot.table.ClassDef
 import java.io.ByteArrayOutputStream
+import java.io.File
 
 fun String.decodeHex(): ByteArray {
     val trimmed = this.replace(Regex("\\s+"), "")
@@ -15,33 +15,100 @@ fun String.decodeHex(): ByteArray {
 fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
 
 sealed class ConstantPoolType {
+    data class UTF8String(val value: String) : ConstantPoolType() {
+        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+            with(out) {
+                +"01"
+                val bytes = value.toByteArray(Charsets.UTF_8)
+                out.ushort(bytes.size)
+                out.write(bytes)
+            }
+        }
+    }
+    data class ClassEntry(val nameRef: UTF8String) : ConstantPoolType() {
+        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+            out.instructionOneArgument("07", cpMap[nameRef]!!)
+        }
+    }
 
-    data class UTF8String(val value: String) : ConstantPoolType()
-    data class ClassEntry(val nameRef: UTF8String) : ConstantPoolType()
-    data class ConstantString(val nameRef: UTF8String) : ConstantPoolType()
-    data class NameAndType(val nameRef: UTF8String, val typeRef: UTF8String) : ConstantPoolType()
-    data class FieldRef(val classRef: ClassEntry, val nameAndTypeRef: NameAndType) : ConstantPoolType()
-    data class MethodRef(val classRef: ClassEntry, val nameAndTypeRef: NameAndType) : ConstantPoolType()
+    data class ConstantString(val nameRef: UTF8String) : ConstantPoolType() {
+        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+            out.instructionOneArgument("08", cpMap[nameRef]!!)
+        }
+    }
+
+    data class NameAndType(val nameRef: UTF8String, val typeRef: UTF8String) : ConstantPoolType() {
+        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+            out.instructionTwoArgument("0c", cpMap[nameRef]!!, cpMap[typeRef]!!)
+        }
+    }
+
+    data class FieldRef(val classRef: ClassEntry, val nameAndTypeRef: NameAndType) : ConstantPoolType() {
+        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+            out.instructionTwoArgument("09", cpMap[classRef]!!, cpMap[nameAndTypeRef]!!)
+        }
+    }
+
+    data class MethodRef(val classRef: ClassEntry, val nameAndTypeRef: NameAndType) : ConstantPoolType() {
+        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+            out.instructionTwoArgument("0a", cpMap[classRef]!!, cpMap[nameAndTypeRef]!!)
+        }
+    }
+
+    abstract fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>)
 }
 
-data class ClassDef(val access: UShort, val classRef: ConstantPoolType.ClassEntry, val superClassRef: ConstantPoolType.ClassEntry)
+sealed class Opcode(val opcode: UByte, val name: String) {
+    abstract class ByteShortOpcode(opcode1: UByte, val opcode2: UByte, name: String) : Opcode(opcode1, name)
+    object GetStatic : Opcode(0xb2u, "GetStatic")
+    object LoadConstant : ByteShortOpcode(0x13u, 0x12u, "LoadConstant")
+    object InvokeVirtual : Opcode(0xb6u, "InvokeVirtual")
+    object Ret : Opcode(0xb1u, "Return")
+}
+sealed class Instruction(open val opcode: Opcode) {
+
+    abstract fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>)
+    data class NoArgument(override val opcode: Opcode) : Instruction(opcode) {
+        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+            out.ubyte(opcode.opcode)
+        }
+    }
+
+    data class OneArgument(override val opcode: Opcode, val arg1: ConstantPoolType) : Instruction(opcode) {
+        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+            val ref1 = cpMap[arg1]!!
+            if ((opcode is Opcode.ByteShortOpcode) && (ref1 <= 256)) {
+                out.ubyte(opcode.opcode2)
+                out.ubyte(ref1.toUByte())
+            } else {
+                out.ubyte(opcode.opcode)
+                out.ushort(ref1)
+            }
+        }
+    }
+    data class TwoArgument(override val opcode: Opcode, val arg1: ConstantPoolType, val arg2: ConstantPoolType) : Instruction(opcode) {
+        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+            out.ubyte(opcode.opcode)
+            val ref1 = cpMap[arg1]!!
+            out.ushort(ref1)
+            val ref2 = cpMap[arg2]!!
+            out.ushort(ref2)
+        }
+    }
+}
+
+data class ClassDef(val access: UShort, val classRef: ConstantPoolType.ClassEntry, val superClassRef: ConstantPoolType.ClassEntry, val methods: List<MethodDef>)
+data class MethodDef(val access: UShort, val methodName: ConstantPoolType.UTF8String, val methodSig: ConstantPoolType.UTF8String, val instructions: List<Instruction>)
 
 class ByteCodeWriter() {
     private val out = ByteArrayOutputStream()
-    private var constantPoolIndex: UShort = 1u
 
     operator fun String.unaryPlus() {
         out.writeBytes(this.decodeHex())
     }
 
-    fun ubyte(value: UShort) {
-        assert(value <= UByte.MAX_VALUE)
-        ubyte(value.toUByte())
-    }
-
-    fun ubyte(value: Int) {
-        assert(value <= UByte.MAX_VALUE.toInt())
-        ubyte(value.toUByte())
+    fun write(bytes: ByteArray) {
+        out.write(bytes)
     }
 
     fun ubyte(value: UByte) {
@@ -65,85 +132,15 @@ class ByteCodeWriter() {
         out.write((value shr 0).toInt())
     }
 
-    fun utf8String(value: String): UShort {
-        +"01"
-        val bytes = value.toByteArray(Charsets.UTF_8)
-        ushort(bytes.size)
-        out.write(bytes)
-        val index = constantPoolIndex++
-        return index
+    fun instructionOneArgument(opcode: String, value: Int) {
+        +opcode
+        ushort(value)
     }
 
-    fun classEntry(value: String): UShort {
-        +"07"
-        val index = constantPoolIndex++
-        ushort(constantPoolIndex)
-        utf8String(value)
-        return index
-    }
-
-    fun constantString(value: String): UShort {
-        +"08"
-        val index = constantPoolIndex++
-        ushort(constantPoolIndex)
-        utf8String(value)
-        return index
-    }
-
-    fun fieldRef(classRef: UShort, nameAndTypeRef: UShort): UShort {
-        +"09"
-        val index = constantPoolIndex++
-        ushort(classRef)
-        ushort(nameAndTypeRef)
-        return index
-    }
-
-    fun methodRef(classRef: UShort, nameAndTypeRef: UShort): UShort {
-        +"0a"
-        val index = constantPoolIndex++
-        ushort(classRef)
-        ushort(nameAndTypeRef)
-        return index
-    }
-
-    fun NameAndType(name: String, type: String) {
-        +"0C"
-        val index = constantPoolIndex++
-        ushort(constantPoolIndex)
-        ushort((constantPoolIndex + 1u).toUShort())
-        utf8String(name)
-        utf8String(type)
-    }
-
-    fun getStatic(ref: UShort) {
-        +"b2"
-        ushort(ref)
-    }
-
-    fun loadConstant(ref: UShort) {
-        +"12"
-        ubyte(ref)
-    }
-
-    fun invokeVirtual(ref: UShort) {
-        +"b6"
-        ushort(ref)
-    }
-
-    fun ret() {
-        +"b1"
-    }
-
-    fun fieldRefWithNameAndType(classRef: UShort, name: String, type: String): UShort {
-        val index = fieldRef(classRef, (constantPoolIndex + 1u).toUShort())
-        NameAndType(name, type)
-        return index
-    }
-
-    fun methodRefWithNameAndType(classRef: UShort, name: String, type: String): UShort {
-        val index = methodRef(classRef, (constantPoolIndex + 1u).toUShort())
-        NameAndType(name, type)
-        return index
+    fun instructionTwoArgument(opcode: String, value1: Int, value2: Int) {
+        +opcode
+        ushort(value1)
+        ushort(value2)
     }
 
     fun toByteArray() =
@@ -184,17 +181,76 @@ class ClassBuilder() {
     fun methodRef(className: String, methodName: String, type: String) =
         methodRef(classEntry(className), methodName, type)
 
-    fun classDef(access: UShort, classRef: ConstantPoolType.ClassEntry, superClassRef: ConstantPoolType.ClassEntry = classEntry("java/lang/Object")): nl.w8mr.kasmine.ClassDef {
-        classDef = ClassDef(access, classRef, superClassRef)
+    fun classDef(access: UShort, classRef: ConstantPoolType.ClassEntry, superClassRef: ConstantPoolType.ClassEntry = classEntry("java/lang/Object"), methods: List<MethodDef>): nl.w8mr.kasmine.ClassDef {
+        classDef = ClassDef(access, classRef, superClassRef, methods)
         return classDef
     }
 
-    fun classDef(access: UShort, className: String, superClassName: String = "java/lang/Object") =
-        classDef(access, classEntry(className), classEntry(superClassName))
+    fun classDef(access: UShort, className: String, superClassName: String = "java/lang/Object", methods: List<MethodDef>) =
+        classDef(access, classEntry(className), classEntry(superClassName), methods)
+
+    fun methodDef(access: UShort, methodName: ConstantPoolType.UTF8String, methodSig: ConstantPoolType.UTF8String, instructions: List<Instruction>) =
+        MethodDef(access, methodName, methodSig, instructions)
+
+    fun methodDef(access: UShort, methodName: String, methodSig: String, instructions: List<Instruction>): MethodDef {
+        if (instructions.isNotEmpty()) utf8String("Code")
+        return methodDef(access, utf8String(methodName), utf8String(methodSig), instructions)
+    }
+
+    fun getStatic(field: ConstantPoolType.FieldRef) = Instruction.OneArgument(Opcode.GetStatic, field)
+    fun getStatic(className: String, fieldName: String, type: String) = getStatic(fieldRef(className, fieldName, type))
+    fun loadConstant(string: ConstantPoolType.ConstantString) = Instruction.OneArgument(Opcode.LoadConstant, string)
+    fun loadConstant(string: String) = loadConstant(constantString(string))
+    fun invokeVirtual(method: ConstantPoolType.MethodRef) = Instruction.OneArgument(Opcode.InvokeVirtual, method)
+    fun invokeVirtual(className: String, methodName: String, type: String) = invokeVirtual(methodRef(className, methodName, type))
+    fun ret() = Instruction.NoArgument(Opcode.Ret)
 
     private inline fun <reified T : ConstantPoolType> addToPool(element: T): T {
         constantPool.merge(element, 1, Int::plus)
         return element
+    }
+
+    fun write(): ByteArray {
+        val out = ByteCodeWriter()
+
+        with(out) {
+            +"cafebabe"
+            ushort(0) // minor version
+            ushort(52) // major version
+            ushort(constantPool.size + 1) // constantPoolSize + 1
+            val cpMap = constantPool.entries.sortedByDescending { it.value }.map { it.key }.withIndex().associate { it.value to (it.index + 1) }
+            cpMap.entries.sortedBy { it.value }.forEach { it.key.write(out, cpMap) }
+
+            ushort(33) // Super Public
+            ushort(cpMap[classDef.classRef]!!) // main class
+            ushort(cpMap[classDef.superClassRef]!!) // main class super
+            ushort(0u) // interface count
+            ushort(0u) // field count
+            ushort(classDef.methods.size) // method count
+            classDef.methods.forEach { method ->
+                ushort(method.access)
+                ushort(cpMap[method.methodName]!!) // main class super
+                ushort(cpMap[method.methodSig]!!) // method signature
+                ushort(1u) // attribute count method
+                ushort(cpMap[ConstantPoolType.UTF8String("Code")]!!) // reference to Code attribute
+                val instWriter = ByteCodeWriter()
+                method.instructions.forEach { it.write(instWriter, cpMap) }
+                val instBytes = instWriter.toByteArray()
+
+                uint((instBytes.size + 12).toUInt()) // code attribute bytes count
+                ushort(2u) // max stack size
+                ushort(1u) // max local var size
+                uint(instBytes.size.toUInt()) // code block bytes count
+                out.write(instBytes)
+                ushort(0) // exception count
+                ushort(0) // attribute count method
+            }
+            ushort(0) // attribute count class
+        }
+
+        val toByteArray = out.toByteArray()
+
+        return toByteArray
     }
 }
 
@@ -205,74 +261,39 @@ class DynamicClassLoader(parent: ClassLoader?) : ClassLoader(parent) {
 }
 
 fun main(vararg args: String) {
-    with(ClassBuilder()) {
-        //val cl = classEntry("HelloWorld")
-        //val scl = classEntry("java/lang/Object")
-        //   val sys = classEntry("java/lang/System")
-        //   val ps = classEntry("java/io/PrintStream")
-        val hello = constantString("Hello World")
-        val out = fieldRef("java/lang/System", "out", "Ljava/io/PrintStream;")
-        val println = methodRef("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
-        val main = utf8String("main")
-        val mainSig = utf8String("([Ljava/lang/String;)V")
-        val code = utf8String("Code")
-
-        //methodDef()
-
-        classDef(33u, "HelloWorld", "java/lang/Object")
-
-        println(constantPool.size)
+    val builder = ClassBuilder()
+    with(builder) {
+        classDef(
+            33u,
+            "HelloWorld",
+            "java/lang/Object",
+            listOf(
+                methodDef(
+                    9u,
+                    "main",
+                    "([Ljava/lang/String;)V",
+                    listOf(
+                        getStatic("java/lang/System", "out", "Ljava/io/PrintStream;"),
+                        loadConstant("Hello World"),
+                        invokeVirtual("java/io/PrintStream", "println", "(Ljava/lang/String;)V"),
+                        ret()
+                    )
+                )
+            )
+        )
     }
+    val bytes = builder.write()
+    File("/Users/TU23DC/HelloWorld.class").writeBytes(bytes)
 
-    val out = ByteCodeWriter()
-
-    with(out) {
-        +"cafebabe"
-        ushort(0) // minor version
-        ushort(52) // major version
-        ushort(22) // constantPoolSize + 1
-        val cl = classEntry("HelloWorld")
-        val scl = classEntry("java/lang/Object")
-        val sys = classEntry("java/lang/System")
-        val ps = classEntry("java/io/PrintStream")
-        val hello = constantString("Hello World")
-        val out = fieldRefWithNameAndType(sys, "out", "Ljava/io/PrintStream;")
-        val println = methodRefWithNameAndType(ps, "println", "(Ljava/lang/String;)V")
-        val main = utf8String("main")
-        val mainSig = utf8String("([Ljava/lang/String;)V")
-        val code = utf8String("Code")
-        ushort(33) // Super Public
-        ushort(cl) // main class
-        ushort(scl) // main class super
-        ushort(0u) // interface count
-        ushort(0u) // field count
-        ushort(1u) // method count
-        ushort(9u) // Access modifier (public 0x001 static 0x008)
-        ushort(main) // method name
-        ushort(mainSig) // method signature
-        ushort(1u) // attribute count
-        ushort(code) // reference to Code attribute
-        uint(21u) // code attribute bytes count
-        ushort(2u) // max stack size
-        ushort(1u) // max local var size
-        uint(9u) // code block bytes count
-        getStatic(out)
-        loadConstant(hello)
-        invokeVirtual(println)
-        ret()
-        ushort(0) // exception count
-        ushort(0) // attribute count method
-        ushort(0) // attribute count class
-    }
-    val actual = out.toByteArray().toHex()
+    val actual = bytes.toHex()
     val expected =
-        "cafebabe00000034001607000201000a48656c6c6f576f726c640700040100106a6176612f6c616e672f4f626a6563740700060100106a6176612f6c616e672f53797374656d0700080100136a6176612f696f2f5072696e7453747265616d08000a01000b48656c6c6f20576f726c64090005000c0c000d000e0100036f75740100154c6a6176612f696f2f5072696e7453747265616d3b0a000700100c001100120100077072696e746c6e010015284c6a6176612f6c616e672f537472696e673b29560100046d61696e010016285b4c6a6176612f6c616e672f537472696e673b2956010004436f646500210001000300000000000100090013001400010015000000150002000100000009b2000b1209b6000fb1000000000000"
+        "cafebabe0000003400160100106a6176612f6c616e672f53797374656d0700010100036f75740100154c6a6176612f696f2f5072696e7453747265616d3b0c00030004090002000501000b48656c6c6f20576f726c640800070100136a6176612f696f2f5072696e7453747265616d0700090100077072696e746c6e010015284c6a6176612f6c616e672f537472696e673b29560c000b000c0a000a000d010004436f64650100046d61696e010016285b4c6a6176612f6c616e672f537472696e673b295601000a48656c6c6f576f726c640700120100106a6176612f6c616e672f4f626a6563740700140021001300150000000000010009001000110001000f000000150002000100000009b200061208b6000eb1000000000000"
     println(actual)
     println(expected)
-    println(expected.startsWith(actual))
+    check(expected.startsWith(actual))
 
     val loader = DynamicClassLoader(Thread.currentThread().contextClassLoader)
-    val helloWorldClass = loader.define("HelloWorld", out.toByteArray())
+    val helloWorldClass = loader.define("HelloWorld", bytes)
     helloWorldClass.getMethod("main", Array<String>::class.java).invoke(null, null)
 }
 /*
