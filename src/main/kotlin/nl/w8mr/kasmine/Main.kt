@@ -63,6 +63,7 @@ sealed class Opcode(val opcode: UByte, val name: String) {
     object GetStatic : Opcode(0xb2u, "GetStatic")
     object LoadConstant : ByteShortOpcode(0x13u, 0x12u, "LoadConstant")
     object InvokeVirtual : Opcode(0xb6u, "InvokeVirtual")
+    object InvokeStatic : Opcode(0xb8u, "InvokeStatic")
     object Ret : Opcode(0xb1u, "Return")
 }
 sealed class Instruction(open val opcode: Opcode) {
@@ -149,7 +150,7 @@ class ByteCodeWriter() {
 
 class ClassBuilder() {
     val constantPool = mutableMapOf<ConstantPoolType, Int>()
-    lateinit var classDef: nl.w8mr.kasmine.ClassDef
+    lateinit var classDef: ClassDef
 
     fun utf8String(value: String) =
         addToPool(ConstantPoolType.UTF8String(value))
@@ -181,7 +182,7 @@ class ClassBuilder() {
     fun methodRef(className: String, methodName: String, type: String) =
         methodRef(classEntry(className), methodName, type)
 
-    fun classDef(access: UShort, classRef: ConstantPoolType.ClassEntry, superClassRef: ConstantPoolType.ClassEntry = classEntry("java/lang/Object"), methods: List<MethodDef>): nl.w8mr.kasmine.ClassDef {
+    fun classDef(access: UShort, classRef: ConstantPoolType.ClassEntry, superClassRef: ConstantPoolType.ClassEntry = classEntry("java/lang/Object"), methods: List<MethodDef>): ClassDef {
         classDef = ClassDef(access, classRef, superClassRef, methods)
         return classDef
     }
@@ -196,14 +197,6 @@ class ClassBuilder() {
         if (instructions.isNotEmpty()) utf8String("Code")
         return methodDef(access, utf8String(methodName), utf8String(methodSig), instructions)
     }
-
-    fun getStatic(field: ConstantPoolType.FieldRef) = Instruction.OneArgument(Opcode.GetStatic, field)
-    fun getStatic(className: String, fieldName: String, type: String) = getStatic(fieldRef(className, fieldName, type))
-    fun loadConstant(string: ConstantPoolType.ConstantString) = Instruction.OneArgument(Opcode.LoadConstant, string)
-    fun loadConstant(string: String) = loadConstant(constantString(string))
-    fun invokeVirtual(method: ConstantPoolType.MethodRef) = Instruction.OneArgument(Opcode.InvokeVirtual, method)
-    fun invokeVirtual(className: String, methodName: String, type: String) = invokeVirtual(methodRef(className, methodName, type))
-    fun ret() = Instruction.NoArgument(Opcode.Ret)
 
     private inline fun <reified T : ConstantPoolType> addToPool(element: T): T {
         constantPool.merge(element, 1, Int::plus)
@@ -254,6 +247,37 @@ class ClassBuilder() {
     }
 }
 
+class InstructionBuilder(val classBuilder: ClassBuilder) {
+    private val instructions = mutableListOf<Instruction>()
+
+    private fun fieldRef(className: String, fieldName: String, type: String): ConstantPoolType.FieldRef =
+        classBuilder.fieldRef(className, fieldName, type)
+
+    private fun constantString(value: String) =
+        classBuilder.constantString(value)
+
+    private fun methodRef(className: String, methodName: String, type: String) =
+        classBuilder.methodRef(className, methodName, type)
+
+    private fun add(instruction: Instruction) {
+        instructions.add(instruction)
+    }
+    fun getStatic(field: ConstantPoolType.FieldRef) = add(Instruction.OneArgument(Opcode.GetStatic, field))
+    fun getStatic(className: String, fieldName: String, type: String) = getStatic(fieldRef(className, fieldName, type))
+
+    fun loadConstant(string: ConstantPoolType.ConstantString) = add(Instruction.OneArgument(Opcode.LoadConstant, string))
+    fun loadConstant(string: String) = loadConstant(constantString(string))
+    fun invokeVirtual(method: ConstantPoolType.MethodRef) = add(Instruction.OneArgument(Opcode.InvokeVirtual, method))
+    fun invokeVirtual(className: String, methodName: String, type: String) = invokeVirtual(methodRef(className, methodName, type))
+
+    fun invokeStatic(method: ConstantPoolType.MethodRef) = add(Instruction.OneArgument(Opcode.InvokeStatic, method))
+    fun invokeStatic(className: String, methodName: String, type: String) = invokeStatic(methodRef(className, methodName, type))
+
+    fun ret() = add(Instruction.NoArgument(Opcode.Ret))
+
+    fun instructions() = instructions.toList()
+}
+
 class DynamicClassLoader(parent: ClassLoader?) : ClassLoader(parent) {
     fun define(className: String?, bytecode: ByteArray): Class<*> {
         return super.defineClass(className, bytecode, 0, bytecode.size)
@@ -272,12 +296,13 @@ fun main(vararg args: String) {
                     9u,
                     "main",
                     "([Ljava/lang/String;)V",
-                    listOf(
-                        getStatic("java/lang/System", "out", "Ljava/io/PrintStream;"),
-                        loadConstant("Hello World"),
-                        invokeVirtual("java/io/PrintStream", "println", "(Ljava/lang/String;)V"),
+                    with(InstructionBuilder(builder)) {
+                        getStatic("java/lang/System", "out", "Ljava/io/PrintStream;")
+                        loadConstant("Hello World")
+                        invokeVirtual("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
                         ret()
-                    )
+                        instructions()
+                    }
                 )
             )
         )
