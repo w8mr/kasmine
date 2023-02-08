@@ -98,8 +98,8 @@ class ClassBuilder() {
                 val instBytes = instWriter.toByteArray()
 
                 uint((instBytes.size + 12).toUInt()) // code attribute bytes count
-                ushort(2u) // max stack size
-                ushort(1u) // max local var size
+                ushort(3u) // TODO: calc max stack size
+                ushort(1u) // TODO: calc max local var size
                 uint(instBytes.size.toUInt()) // code block bytes count
                 out.write(instBytes)
                 ushort(0) // exception count
