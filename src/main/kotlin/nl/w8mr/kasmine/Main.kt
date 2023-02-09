@@ -65,6 +65,9 @@ sealed class Opcode(val opcode: UByte, val name: String) {
     object InvokeVirtual : Opcode(0xb6u, "InvokeVirtual")
     object InvokeStatic : Opcode(0xb8u, "InvokeStatic")
     object Ret : Opcode(0xb1u, "Return")
+    object AStore : Opcode(0x3au, "AStore")
+    object ALoad : Opcode(0x19u, "ALoad")
+
 }
 sealed class Instruction(open val opcode: Opcode) {
 
@@ -72,6 +75,14 @@ sealed class Instruction(open val opcode: Opcode) {
     data class NoArgument(override val opcode: Opcode) : Instruction(opcode) {
         override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
             out.ubyte(opcode.opcode)
+        }
+    }
+
+    data class OneArgumentConst(override val opcode: Opcode, val value: UByte) : Instruction(opcode) {
+        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+            out.ubyte(opcode.opcode)
+            out.ubyte(value)
+            //TODO wide
         }
     }
 

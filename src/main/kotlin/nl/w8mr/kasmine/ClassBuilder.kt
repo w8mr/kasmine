@@ -64,7 +64,10 @@ class ClassBuilder() {
         return classDef(dsl.access, dsl.name, dsl.superClass, classDsl.methods)
     }
 
-
+    val localVarMap = mutableMapOf<String, UByte>()
+    fun localVar(name: String): UByte {
+        return localVarMap.getOrPut(name) { localVarMap.size.toUByte() }
+    }
     private inline fun <reified T : ConstantPoolType> addToPool(element: T): T {
         constantPool.merge(element, 1, Int::plus)
         return element
@@ -98,8 +101,8 @@ class ClassBuilder() {
                 val instBytes = instWriter.toByteArray()
 
                 uint((instBytes.size + 12).toUInt()) // code attribute bytes count
-                ushort(3u) // TODO: calc max stack size
-                ushort(1u) // TODO: calc max local var size
+                ushort(10u) // TODO: calc max stack size
+                ushort(10u) // TODO: calc max local var size
                 uint(instBytes.size.toUInt()) // code block bytes count
                 out.write(instBytes)
                 ushort(0) // exception count
@@ -158,6 +161,8 @@ class ClassBuilder() {
 
             fun ret() = add(Instruction.NoArgument(Opcode.Ret))
 
+            fun astore(identifier: String) = add(Instruction.OneArgumentConst(Opcode.AStore, localVar(identifier)))
+            fun aload(identifier: String) = add(Instruction.OneArgumentConst(Opcode.ALoad, localVar(identifier)))
         }
     }
 
