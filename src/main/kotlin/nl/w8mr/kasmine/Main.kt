@@ -20,11 +20,20 @@ sealed class ConstantPoolType {
             with(out) {
                 +"01"
                 val bytes = value.toByteArray(Charsets.UTF_8)
-                out.ushort(bytes.size)
-                out.write(bytes)
+                ushort(bytes.size)
+                write(bytes)
             }
         }
     }
+    data class ConstantInteger(val value: Int) : ConstantPoolType() {
+        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+            with(out) {
+                +"03"
+                uint(value.toUInt())
+            }
+        }
+    }
+
     data class ClassEntry(val nameRef: UTF8String) : ConstantPoolType() {
         override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
             out.instructionOneArgument("07", cpMap[nameRef]!!)
@@ -67,6 +76,8 @@ sealed class Opcode(val opcode: UByte, val name: String) {
     object Ret : Opcode(0xb1u, "Return")
     object AStore : Opcode(0x3au, "AStore")
     object ALoad : Opcode(0x19u, "ALoad")
+    object IStore : Opcode(0x36u, "IStore")
+    object ILoad : Opcode(0x15u, "ILoad")
 
 }
 sealed class Instruction(open val opcode: Opcode) {

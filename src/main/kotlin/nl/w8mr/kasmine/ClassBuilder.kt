@@ -19,6 +19,9 @@ class ClassBuilder() {
     fun constantString(value: String) =
         addToPool(ConstantPoolType.ConstantString(utf8String(value)))
 
+    fun constantInteger(value: Int) =
+        addToPool(ConstantPoolType.ConstantInteger(value))
+
     fun nameAndType(name: String, type: String) =
         addToPool(ConstantPoolType.NameAndType(utf8String(name), utf8String(type)))
 
@@ -151,8 +154,11 @@ class ClassBuilder() {
             fun getStatic(field: ConstantPoolType.FieldRef) = add(Instruction.OneArgument(Opcode.GetStatic, field))
             fun getStatic(className: String, fieldName: String, type: String) = getStatic(fieldRef(className, fieldName, type))
 
-            fun loadConstant(string: ConstantPoolType.ConstantString) = add(Instruction.OneArgument(Opcode.LoadConstant, string))
+            fun loadConstant(constant: ConstantPoolType) = add(Instruction.OneArgument(Opcode.LoadConstant, constant))
             fun loadConstant(string: String) = loadConstant(constantString(string))
+
+            fun loadConstant(value: Int) = loadConstant(constantInteger(value))
+
             fun invokeVirtual(method: ConstantPoolType.MethodRef) = add(Instruction.OneArgument(Opcode.InvokeVirtual, method))
             fun invokeVirtual(className: String, methodName: String, type: String) = invokeVirtual(methodRef(className, methodName, type))
 
@@ -163,6 +169,9 @@ class ClassBuilder() {
 
             fun astore(identifier: String) = add(Instruction.OneArgumentConst(Opcode.AStore, localVar(identifier)))
             fun aload(identifier: String) = add(Instruction.OneArgumentConst(Opcode.ALoad, localVar(identifier)))
+
+            fun istore(identifier: String) = add(Instruction.OneArgumentConst(Opcode.IStore, localVar(identifier)))
+            fun iload(identifier: String) = add(Instruction.OneArgumentConst(Opcode.ILoad, localVar(identifier)))
         }
     }
 
