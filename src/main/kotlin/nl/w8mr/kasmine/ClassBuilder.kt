@@ -172,6 +172,10 @@ class ClassBuilder() {
 
             fun istore(identifier: String) = add(Instruction.OneArgumentConst(Opcode.IStore, localVar(identifier)))
             fun iload(identifier: String) = add(Instruction.OneArgumentConst(Opcode.ILoad, localVar(identifier)))
+            fun dup() = add(Instruction.NoArgument(Opcode.Dup))
+            fun pop() = add(Instruction.NoArgument(Opcode.Pop))
+
+
         }
     }
 
