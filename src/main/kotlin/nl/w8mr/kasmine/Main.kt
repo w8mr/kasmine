@@ -125,7 +125,7 @@ sealed class Instruction(open val opcode: Opcode) {
 data class ClassDef(val access: UShort, val classRef: ConstantPoolType.ClassEntry, val superClassRef: ConstantPoolType.ClassEntry, val methods: List<MethodDef>)
 data class MethodDef(val access: UShort, val methodName: ConstantPoolType.UTF8String, val methodSig: ConstantPoolType.UTF8String, val instructions: List<Instruction>)
 
-class ByteCodeWriter() {
+class ByteCodeWriter {
     private val out = ByteArrayOutputStream()
 
     operator fun String.unaryPlus() {

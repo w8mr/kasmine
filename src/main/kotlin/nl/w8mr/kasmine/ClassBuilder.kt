@@ -6,7 +6,7 @@ fun classBuilder(init: ClassBuilder.ClassDSL.DSL.() -> Unit): ClassBuilder {
     return builder
 }
 
-class ClassBuilder() {
+class ClassBuilder {
     val constantPool = mutableMapOf<ConstantPoolType, Int>()
     lateinit var classDef: ClassDef
 
@@ -120,10 +120,10 @@ class ClassBuilder() {
     }
 
 
-    inner class ClassDSL() {
+    inner class ClassDSL {
         val methods = mutableListOf<MethodDef>()
 
-        inner class DSL() {
+        inner class DSL {
             lateinit var name : String
             var access: UShort = 33u
             var superClass: String = "java/lang/Object"
@@ -140,10 +140,10 @@ class ClassBuilder() {
 
     }
 
-    inner class MethodDSL() {
+    inner class MethodDSL {
         val instructions = mutableListOf<Instruction>()
 
-        inner class DSL() {
+        inner class DSL {
             lateinit var name : String
             lateinit var signature : String
             var access: UShort = 9u
