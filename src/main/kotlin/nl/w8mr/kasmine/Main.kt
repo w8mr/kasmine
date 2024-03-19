@@ -177,7 +177,7 @@ class DynamicClassLoader(parent: ClassLoader?) : ClassLoader(parent) {
     }
 }
 
-fun main(vararg args: String) {
+fun main() {
     val clazz = classBuilder {
         name = "HelloWorld"
         method {
