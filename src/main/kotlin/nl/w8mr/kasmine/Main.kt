@@ -16,7 +16,10 @@ fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x
 
 sealed class ConstantPoolType {
     data class UTF8String(val value: String) : ConstantPoolType() {
-        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
             with(out) {
                 +"01"
                 val bytes = value.toByteArray(Charsets.UTF_8)
@@ -25,8 +28,12 @@ sealed class ConstantPoolType {
             }
         }
     }
+
     data class ConstantInteger(val value: Int) : ConstantPoolType() {
-        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
             with(out) {
                 +"03"
                 uint(value.toUInt())
@@ -35,72 +42,117 @@ sealed class ConstantPoolType {
     }
 
     data class ClassEntry(val nameRef: UTF8String) : ConstantPoolType() {
-        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
             out.instructionOneArgument("07", cpMap[nameRef]!!)
         }
     }
 
     data class ConstantString(val nameRef: UTF8String) : ConstantPoolType() {
-        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
             out.instructionOneArgument("08", cpMap[nameRef]!!)
         }
     }
 
     data class NameAndType(val nameRef: UTF8String, val typeRef: UTF8String) : ConstantPoolType() {
-        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
             out.instructionTwoArgument("0c", cpMap[nameRef]!!, cpMap[typeRef]!!)
         }
     }
 
     data class FieldRef(val classRef: ClassEntry, val nameAndTypeRef: NameAndType) : ConstantPoolType() {
-        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
             out.instructionTwoArgument("09", cpMap[classRef]!!, cpMap[nameAndTypeRef]!!)
         }
     }
 
     data class MethodRef(val classRef: ClassEntry, val nameAndTypeRef: NameAndType) : ConstantPoolType() {
-        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
             out.instructionTwoArgument("0a", cpMap[classRef]!!, cpMap[nameAndTypeRef]!!)
         }
     }
 
-    abstract fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>)
+    abstract fun write(
+        out: ByteCodeWriter,
+        cpMap: Map<ConstantPoolType, Int>,
+    )
 }
 
 sealed class Opcode(val opcode: UByte, val name: String) {
     abstract class ByteShortOpcode(opcode1: UByte, val opcode2: UByte, name: String) : Opcode(opcode1, name)
+
     object GetStatic : Opcode(0xb2u, "GetStatic")
+
     object LoadConstant : ByteShortOpcode(0x13u, 0x12u, "LoadConstant")
+
     object InvokeVirtual : Opcode(0xb6u, "InvokeVirtual")
+
     object InvokeStatic : Opcode(0xb8u, "InvokeStatic")
-    object Ret : Opcode(0xb1u, "Return")
+
+    object Return : Opcode(0xb1u, "Return")
+
+    object IReturn : Opcode(0xacu, "IReturn")
+
+    object AReturn : Opcode(0xb0u, "AReturn")
+
     object AStore : Opcode(0x3au, "AStore")
+
     object ALoad : Opcode(0x19u, "ALoad")
+
     object IStore : Opcode(0x36u, "IStore")
+
     object ILoad : Opcode(0x15u, "ILoad")
+
     object Dup : Opcode(0x59u, "Dup")
+
     object Pop : Opcode(0x57u, "Pop")
-
 }
-sealed class Instruction(open val opcode: Opcode) {
 
-    abstract fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>)
+sealed class Instruction(open val opcode: Opcode) {
+    abstract fun write(
+        out: ByteCodeWriter,
+        cpMap: Map<ConstantPoolType, Int>,
+    )
+
     data class NoArgument(override val opcode: Opcode) : Instruction(opcode) {
-        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
             out.ubyte(opcode.opcode)
         }
     }
 
     data class OneArgumentConst(override val opcode: Opcode, val value: UByte) : Instruction(opcode) {
-        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
             out.ubyte(opcode.opcode)
             out.ubyte(value)
-            //TODO wide
+            // TODO wide
         }
     }
 
     data class OneArgument(override val opcode: Opcode, val arg1: ConstantPoolType) : Instruction(opcode) {
-        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
             val ref1 = cpMap[arg1]!!
             if ((opcode is Opcode.ByteShortOpcode) && (ref1 <= 256)) {
                 out.ubyte(opcode.opcode2)
@@ -111,8 +163,12 @@ sealed class Instruction(open val opcode: Opcode) {
             }
         }
     }
+
     data class TwoArgument(override val opcode: Opcode, val arg1: ConstantPoolType, val arg2: ConstantPoolType) : Instruction(opcode) {
-        override fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
             out.ubyte(opcode.opcode)
             val ref1 = cpMap[arg1]!!
             out.ushort(ref1)
@@ -123,6 +179,7 @@ sealed class Instruction(open val opcode: Opcode) {
 }
 
 data class ClassDef(val access: UShort, val classRef: ConstantPoolType.ClassEntry, val superClassRef: ConstantPoolType.ClassEntry, val methods: List<MethodDef>)
+
 data class MethodDef(val access: UShort, val methodName: ConstantPoolType.UTF8String, val methodSig: ConstantPoolType.UTF8String, val instructions: List<Instruction>)
 
 class ByteCodeWriter {
@@ -157,38 +214,49 @@ class ByteCodeWriter {
         out.write((value shr 0).toInt())
     }
 
-    fun instructionOneArgument(opcode: String, value: Int) {
+    fun instructionOneArgument(
+        opcode: String,
+        value: Int,
+    ) {
         +opcode
         ushort(value)
     }
 
-    fun instructionTwoArgument(opcode: String, value1: Int, value2: Int) {
+    fun instructionTwoArgument(
+        opcode: String,
+        value1: Int,
+        value2: Int,
+    ) {
         +opcode
         ushort(value1)
         ushort(value2)
     }
 
-    fun toByteArray() =
-        out.toByteArray()
+    fun toByteArray() = out.toByteArray()
 }
+
 class DynamicClassLoader(parent: ClassLoader?) : ClassLoader(parent) {
-    fun define(className: String?, bytecode: ByteArray): Class<*> {
+    fun define(
+        className: String?,
+        bytecode: ByteArray,
+    ): Class<*> {
         return super.defineClass(className, bytecode, 0, bytecode.size)
     }
 }
 
 fun main() {
-    val clazz = classBuilder {
-        name = "HelloWorld"
-        method {
-            name = "main"
-            signature = "([Ljava/lang/String;)V"
-            getStatic("java/lang/System", "out", "Ljava/io/PrintStream;")
-            loadConstant("Hello World")
-            invokeVirtual("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
-            ret()
+    val clazz =
+        classBuilder {
+            name = "HelloWorld"
+            method {
+                name = "main"
+                signature = "([Ljava/lang/String;)V"
+                getStatic("java/lang/System", "out", "Ljava/io/PrintStream;")
+                loadConstant("Hello World")
+                invokeVirtual("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
+                `return`()
+            }
         }
-    }
     val bytes = clazz.write()
     File("/Users/TU23DC/HelloWorld.class").writeBytes(bytes)
 
