@@ -201,9 +201,41 @@ class ClassBuilder {
 
             private fun loadConstant(constant: ConstantPoolType) = add(Instruction.OneArgument(Opcode.LoadConstant, constant))
 
+            private fun iconstm1() = add(Instruction.NoArgument(Opcode.IConstM1))
+
+            private fun iconst0() = add(Instruction.NoArgument(Opcode.IConst0))
+
+            private fun iconst1() = add(Instruction.NoArgument(Opcode.IConst1))
+
+            private fun iconst2() = add(Instruction.NoArgument(Opcode.IConst2))
+
+            private fun iconst3() = add(Instruction.NoArgument(Opcode.IConst3))
+
+            private fun iconst4() = add(Instruction.NoArgument(Opcode.IConst4))
+
+            private fun iconst5() = add(Instruction.NoArgument(Opcode.IConst5))
+
+            private fun bipush(value: Byte) = add(Instruction.OneArgumentByte(Opcode.BiPush, value))
+
+            private fun sipush(value: Short) = add(Instruction.OneArgumentShort(Opcode.SiPush, value))
+
             fun loadConstant(string: String) = loadConstant(constantString(string))
 
-            fun loadConstant(value: Int) = loadConstant(constantInteger(value))
+            fun loadConstant(value: Int) =
+                when (value) {
+                    0 -> iconst0()
+                    1 -> iconst1()
+                    2 -> iconst2()
+                    3 -> iconst3()
+                    4 -> iconst4()
+                    5 -> iconst5()
+                    -1 -> iconstm1()
+                    in 6..127 -> bipush(value.toByte())
+                    in -2..-128 -> bipush(value.toByte())
+                    in 128..32767 -> sipush(value.toShort())
+                    in -129..-32768 -> sipush(value.toShort())
+                    else -> loadConstant(constantInteger(value))
+                }
 
             private fun invokeVirtual(method: ConstantPoolType.MethodRef) = add(Instruction.OneArgument(Opcode.InvokeVirtual, method))
 
@@ -229,13 +261,13 @@ class ClassBuilder {
 
             fun parameter(identifier: String) = localVar(identifier)
 
-            fun astore(identifier: String) = add(Instruction.OneArgumentConst(Opcode.AStore, localVar(identifier)))
+            fun astore(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.AStore, localVar(identifier)))
 
-            fun aload(identifier: String) = add(Instruction.OneArgumentConst(Opcode.ALoad, localVar(identifier)))
+            fun aload(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.ALoad, localVar(identifier)))
 
-            fun istore(identifier: String) = add(Instruction.OneArgumentConst(Opcode.IStore, localVar(identifier)))
+            fun istore(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.IStore, localVar(identifier)))
 
-            fun iload(identifier: String) = add(Instruction.OneArgumentConst(Opcode.ILoad, localVar(identifier)))
+            fun iload(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.ILoad, localVar(identifier)))
 
             fun dup() = add(Instruction.NoArgument(Opcode.Dup))
 

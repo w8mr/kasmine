@@ -95,6 +95,24 @@ sealed class ConstantPoolType {
 sealed class Opcode(val opcode: UByte, val name: String) {
     abstract class ByteShortOpcode(opcode1: UByte, val opcode2: UByte, name: String) : Opcode(opcode1, name)
 
+    object IConstM1 : Opcode(0x02u, "IConstM1")
+
+    object IConst0 : Opcode(0x03u, "IConst0")
+
+    object IConst1 : Opcode(0x04u, "IConst1")
+
+    object IConst2 : Opcode(0x05u, "IConst2")
+
+    object IConst3 : Opcode(0x06u, "IConst3")
+
+    object IConst4 : Opcode(0x07u, "IConst4")
+
+    object IConst5 : Opcode(0x08u, "IConst5")
+
+    object BiPush : Opcode(0x10u, "BiPush")
+
+    object SiPush : Opcode(0x11u, "SiPush")
+
     object GetStatic : Opcode(0xb2u, "GetStatic")
 
     object LoadConstant : ByteShortOpcode(0x13u, 0x12u, "LoadConstant")
@@ -137,13 +155,35 @@ sealed class Instruction(open val opcode: Opcode) {
         }
     }
 
-    data class OneArgumentConst(override val opcode: Opcode, val value: UByte) : Instruction(opcode) {
+    data class OneArgumentUByte(override val opcode: Opcode, val value: UByte) : Instruction(opcode) {
         override fun write(
             out: ByteCodeWriter,
             cpMap: Map<ConstantPoolType, Int>,
         ) {
             out.ubyte(opcode.opcode)
             out.ubyte(value)
+            // TODO wide
+        }
+    }
+
+    data class OneArgumentByte(override val opcode: Opcode, val value: Byte) : Instruction(opcode) {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
+            out.ubyte(opcode.opcode)
+            out.byte(value)
+            // TODO wide
+        }
+    }
+
+    data class OneArgumentShort(override val opcode: Opcode, val value: Short) : Instruction(opcode) {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
+            out.ubyte(opcode.opcode)
+            out.short(value)
             // TODO wide
         }
     }
@@ -193,6 +233,10 @@ class ByteCodeWriter {
         out.write(bytes)
     }
 
+    fun byte(value: Byte) {
+        out.write(value.toInt())
+    }
+
     fun ubyte(value: UByte) {
         out.write(value.toInt())
     }
@@ -204,6 +248,11 @@ class ByteCodeWriter {
 
     fun ushort(value: UShort) {
         out.write(value.toInt() shr 8)
+        out.write(value.toInt())
+    }
+
+    fun short(value: Short) {
+        out.write(if (value < 0) (value.toInt() shr 8) and 128 else (value.toInt() shr 8))
         out.write(value.toInt())
     }
 
