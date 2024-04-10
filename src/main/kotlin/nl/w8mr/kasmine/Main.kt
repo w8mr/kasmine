@@ -138,6 +138,24 @@ sealed class Opcode(val opcode: UByte, val name: String) {
     object Dup : Opcode(0x59u, "Dup")
 
     object Pop : Opcode(0x57u, "Pop")
+
+    object IfNotEqual : Opcode(0x9au, "IfNotEqual")
+
+    object IfEqual : Opcode(0x99u, "IfNotEqual")
+
+    object Goto : Opcode(0xa7u, "Goto")
+}
+
+class InstructionBlock {
+    val instructions: MutableList<Instruction> = mutableListOf()
+    var byteSize: Int = 0
+    var maxStack: Int = 0
+    var currentStack: Int = 0
+
+    private fun add(instruction: Instruction) {
+        byteSize += instruction.byteSize
+        instructions.add(instruction)
+    }
 }
 
 sealed class Instruction(open val opcode: Opcode) {
@@ -146,6 +164,8 @@ sealed class Instruction(open val opcode: Opcode) {
         cpMap: Map<ConstantPoolType, Int>,
     )
 
+    abstract val byteSize: Int
+
     data class NoArgument(override val opcode: Opcode) : Instruction(opcode) {
         override fun write(
             out: ByteCodeWriter,
@@ -153,6 +173,8 @@ sealed class Instruction(open val opcode: Opcode) {
         ) {
             out.ubyte(opcode.opcode)
         }
+
+        override val byteSize: Int = 1
     }
 
     data class OneArgumentUByte(override val opcode: Opcode, val value: UByte) : Instruction(opcode) {
@@ -164,6 +186,8 @@ sealed class Instruction(open val opcode: Opcode) {
             out.ubyte(value)
             // TODO wide
         }
+
+        override val byteSize: Int = 2
     }
 
     data class OneArgumentByte(override val opcode: Opcode, val value: Byte) : Instruction(opcode) {
@@ -175,6 +199,8 @@ sealed class Instruction(open val opcode: Opcode) {
             out.byte(value)
             // TODO wide
         }
+
+        override val byteSize: Int = 2
     }
 
     data class OneArgumentShort(override val opcode: Opcode, val value: Short) : Instruction(opcode) {
@@ -186,6 +212,21 @@ sealed class Instruction(open val opcode: Opcode) {
             out.short(value)
             // TODO wide
         }
+
+        override val byteSize: Int = 3
+    }
+
+    data class OneArgumentUShort(override val opcode: Opcode, val value: UShort) : Instruction(opcode) {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
+            out.ubyte(opcode.opcode)
+            out.ushort(value)
+            // TODO wide
+        }
+
+        override val byteSize: Int = 3
     }
 
     data class OneArgument(override val opcode: Opcode, val arg1: ConstantPoolType) : Instruction(opcode) {
@@ -194,14 +235,17 @@ sealed class Instruction(open val opcode: Opcode) {
             cpMap: Map<ConstantPoolType, Int>,
         ) {
             val ref1 = cpMap[arg1]!!
-            if ((opcode is Opcode.ByteShortOpcode) && (ref1 <= 256)) {
-                out.ubyte(opcode.opcode2)
-                out.ubyte(ref1.toUByte())
-            } else {
-                out.ubyte(opcode.opcode)
-                out.ushort(ref1)
-            }
+// TODO check how to deal with dynamic sizes?
+//            if ((opcode is Opcode.ByteShortOpcode) && (ref1 <= 256)) {
+//                out.ubyte(opcode.opcode2)
+//                out.ubyte(ref1.toUByte())
+//            } else {
+            out.ubyte(opcode.opcode)
+            out.ushort(ref1)
+//            }
         }
+
+        override val byteSize: Int = 3
     }
 
     data class TwoArgument(override val opcode: Opcode, val arg1: ConstantPoolType, val arg2: ConstantPoolType) : Instruction(opcode) {
@@ -215,6 +259,8 @@ sealed class Instruction(open val opcode: Opcode) {
             val ref2 = cpMap[arg2]!!
             out.ushort(ref2)
         }
+
+        override val byteSize: Int = 5
     }
 }
 
@@ -296,7 +342,7 @@ class DynamicClassLoader(parent: ClassLoader?) : ClassLoader(parent) {
 fun main() {
     val clazz =
         classBuilder {
-            name = "HelloWorld"
+            name = "Script"
             method {
                 name = "main"
                 signature = "([Ljava/lang/String;)V"
@@ -307,7 +353,7 @@ fun main() {
             }
         }
     val bytes = clazz.write()
-    File("/Users/TU23DC/HelloWorld.class").writeBytes(bytes)
+    File("/Users/TU23DC/Script.class").writeBytes(bytes)
 
     val actual = bytes.toHex()
     val expected =
@@ -317,8 +363,8 @@ fun main() {
     check(expected.startsWith(actual))
 
     val loader = DynamicClassLoader(Thread.currentThread().contextClassLoader)
-    val helloWorldClass = loader.define("HelloWorld", bytes)
-    helloWorldClass.getMethod("main", Array<String>::class.java).invoke(null, null)
+    val ScriptClass = loader.define("Script", bytes)
+    ScriptClass.getMethod("main", Array<String>::class.java).invoke(null, null)
 }
 
 /*

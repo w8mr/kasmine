@@ -113,7 +113,7 @@ class ClassBuilder {
         with(out) {
             +"cafebabe"
             ushort(0) // minor version
-            ushort(52) // major version
+            ushort(49) // major version
             ushort(constantPool.size + 1) // constantPoolSize + 1
             val cpMap =
                 constantPool.entries.sortedByDescending { it.value }
@@ -259,8 +259,6 @@ class ClassBuilder {
 
             fun areturn() = add(Instruction.NoArgument(Opcode.AReturn))
 
-            fun parameter(identifier: String) = localVar(identifier)
-
             fun astore(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.AStore, localVar(identifier)))
 
             fun aload(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.ALoad, localVar(identifier)))
@@ -272,6 +270,12 @@ class ClassBuilder {
             fun dup() = add(Instruction.NoArgument(Opcode.Dup))
 
             fun pop() = add(Instruction.NoArgument(Opcode.Pop))
+
+            fun ifnotequal(jump: Short) = add(Instruction.OneArgumentShort(Opcode.IfNotEqual, jump))
+
+            fun ifequal(jump: Short) = add(Instruction.OneArgumentShort(Opcode.IfEqual, jump))
+
+            fun goto(jump: Short) = add(Instruction.OneArgumentShort(Opcode.Goto, jump))
         }
     }
 }
