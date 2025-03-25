@@ -158,15 +158,26 @@ class InstructionBlock {
     }
 }
 
-sealed class Instruction(open val opcode: Opcode) {
+sealed interface Instruction {
+    val opcode: Opcode
+
+    abstract val byteSize: Int
     abstract fun write(
         out: ByteCodeWriter,
         cpMap: Map<ConstantPoolType, Int>,
     )
 
-    abstract val byteSize: Int
 
-    data class NoArgument(override val opcode: Opcode) : Instruction(opcode) {
+    interface OneArgument<T: Any>: Instruction {
+        val value: T
+    }
+
+    interface TwoArgument<T: Any, R: Any>: Instruction {
+        val value1: T
+        val value2: R
+    }
+
+    data class NoArgument(override val opcode: Opcode) : Instruction {
         override fun write(
             out: ByteCodeWriter,
             cpMap: Map<ConstantPoolType, Int>,
@@ -177,7 +188,7 @@ sealed class Instruction(open val opcode: Opcode) {
         override val byteSize: Int = 1
     }
 
-    data class OneArgumentUByte(override val opcode: Opcode, val value: UByte) : Instruction(opcode) {
+    data class OneArgumentUByte(override val opcode: Opcode, override val value: UByte) : OneArgument<UByte> {
         override fun write(
             out: ByteCodeWriter,
             cpMap: Map<ConstantPoolType, Int>,
@@ -190,7 +201,7 @@ sealed class Instruction(open val opcode: Opcode) {
         override val byteSize: Int = 2
     }
 
-    data class OneArgumentByte(override val opcode: Opcode, val value: Byte) : Instruction(opcode) {
+    data class OneArgumentByte(override val opcode: Opcode, override val value: Byte) : OneArgument<Byte> {
         override fun write(
             out: ByteCodeWriter,
             cpMap: Map<ConstantPoolType, Int>,
@@ -203,7 +214,7 @@ sealed class Instruction(open val opcode: Opcode) {
         override val byteSize: Int = 2
     }
 
-    data class OneArgumentShort(override val opcode: Opcode, val value: Short) : Instruction(opcode) {
+    data class OneArgumentShort(override val opcode: Opcode, override val value: Short) : OneArgument<Short> {
         override fun write(
             out: ByteCodeWriter,
             cpMap: Map<ConstantPoolType, Int>,
@@ -216,7 +227,7 @@ sealed class Instruction(open val opcode: Opcode) {
         override val byteSize: Int = 3
     }
 
-    data class OneArgumentUShort(override val opcode: Opcode, val value: UShort) : Instruction(opcode) {
+    data class OneArgumentUShort(override val opcode: Opcode, override val value: UShort) : OneArgument<UShort> {
         override fun write(
             out: ByteCodeWriter,
             cpMap: Map<ConstantPoolType, Int>,
@@ -229,12 +240,12 @@ sealed class Instruction(open val opcode: Opcode) {
         override val byteSize: Int = 3
     }
 
-    data class OneArgument(override val opcode: Opcode, val arg1: ConstantPoolType) : Instruction(opcode) {
+    data class OneArgumentPool(override val opcode: Opcode, override val value: ConstantPoolType) : OneArgument<ConstantPoolType> {
         override fun write(
             out: ByteCodeWriter,
             cpMap: Map<ConstantPoolType, Int>,
         ) {
-            val ref1 = cpMap[arg1]!!
+            val ref1 = cpMap[value]!!
 // TODO check how to deal with dynamic sizes?
 //            if ((opcode is Opcode.ByteShortOpcode) && (ref1 <= 256)) {
 //                out.ubyte(opcode.opcode2)
@@ -248,15 +259,15 @@ sealed class Instruction(open val opcode: Opcode) {
         override val byteSize: Int = 3
     }
 
-    data class TwoArgument(override val opcode: Opcode, val arg1: ConstantPoolType, val arg2: ConstantPoolType) : Instruction(opcode) {
+    data class TwoArgumentPool(override val opcode: Opcode, override val value1: ConstantPoolType, override val value2: ConstantPoolType) : TwoArgument<ConstantPoolType, ConstantPoolType> {
         override fun write(
             out: ByteCodeWriter,
             cpMap: Map<ConstantPoolType, Int>,
         ) {
             out.ubyte(opcode.opcode)
-            val ref1 = cpMap[arg1]!!
+            val ref1 = cpMap[value1]!!
             out.ushort(ref1)
-            val ref2 = cpMap[arg2]!!
+            val ref2 = cpMap[value2]!!
             out.ushort(ref2)
         }
 

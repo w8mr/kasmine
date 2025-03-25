@@ -8,7 +8,7 @@ fun classBuilder(init: ClassBuilder.ClassDSL.DSL.() -> Unit): ClassBuilder {
 
 class ClassBuilder {
     private val constantPool = mutableMapOf<ConstantPoolType, Int>()
-    private lateinit var classDef: ClassDef
+    lateinit var classDef: ClassDef
 
     private fun utf8String(value: String) = addToPool(ConstantPoolType.UTF8String(value))
 
@@ -191,7 +191,7 @@ class ClassBuilder {
                 instructions.add(instruction)
             }
 
-            private fun getStatic(field: ConstantPoolType.FieldRef) = add(Instruction.OneArgument(Opcode.GetStatic, field))
+            private fun getStatic(field: ConstantPoolType.FieldRef) = add(Instruction.OneArgumentPool(Opcode.GetStatic, field))
 
             fun getStatic(
                 className: String,
@@ -199,7 +199,7 @@ class ClassBuilder {
                 type: String,
             ) = getStatic(fieldRef(className, fieldName, type))
 
-            private fun loadConstant(constant: ConstantPoolType) = add(Instruction.OneArgument(Opcode.LoadConstant, constant))
+            private fun loadConstant(constant: ConstantPoolType) = add(Instruction.OneArgumentPool(Opcode.LoadConstant, constant))
 
             private fun iconstm1() = add(Instruction.NoArgument(Opcode.IConstM1))
 
@@ -237,7 +237,7 @@ class ClassBuilder {
                     else -> loadConstant(constantInteger(value))
                 }
 
-            private fun invokeVirtual(method: ConstantPoolType.MethodRef) = add(Instruction.OneArgument(Opcode.InvokeVirtual, method))
+            private fun invokeVirtual(method: ConstantPoolType.MethodRef) = add(Instruction.OneArgumentPool(Opcode.InvokeVirtual, method))
 
             fun invokeVirtual(
                 className: String,
@@ -245,7 +245,7 @@ class ClassBuilder {
                 type: String,
             ) = invokeVirtual(methodRef(className, methodName, type))
 
-            private fun invokeStatic(method: ConstantPoolType.MethodRef) = add(Instruction.OneArgument(Opcode.InvokeStatic, method))
+            private fun invokeStatic(method: ConstantPoolType.MethodRef) = add(Instruction.OneArgumentPool(Opcode.InvokeStatic, method))
 
             fun invokeStatic(
                 className: String,
