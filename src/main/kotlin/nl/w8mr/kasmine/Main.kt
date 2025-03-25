@@ -277,7 +277,7 @@ sealed interface Instruction {
 
 data class ClassDef(val access: UShort, val classRef: ConstantPoolType.ClassEntry, val superClassRef: ConstantPoolType.ClassEntry, val methods: List<MethodDef>)
 
-data class MethodDef(val access: UShort, val methodName: ConstantPoolType.UTF8String, val methodSig: ConstantPoolType.UTF8String, val instructions: List<Instruction>)
+data class MethodDef(val access: UShort, val methodName: ConstantPoolType.UTF8String, val methodSig: ConstantPoolType.UTF8String, val instructions: List<InstructionBlock>)
 
 class ByteCodeWriter {
     private val out = ByteArrayOutputStream()

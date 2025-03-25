@@ -1,5 +1,7 @@
 package nl.w8mr.kasmine
 
+import kotlin.apply
+
 fun classBuilder(init: ClassBuilder.ClassDSL.DSL.() -> Unit): ClassBuilder {
     val builder = ClassBuilder()
     builder.classDef(init)
@@ -81,14 +83,14 @@ class ClassBuilder {
         access: UShort,
         methodName: ConstantPoolType.UTF8String,
         methodSig: ConstantPoolType.UTF8String,
-        instructions: List<Instruction>,
+        instructions: List<InstructionBlock>,
     ) = MethodDef(access, methodName, methodSig, instructions)
 
     fun methodDef(
         access: UShort,
         methodName: String,
         methodSig: String,
-        instructions: List<Instruction>,
+        instructions: List<InstructionBlock>,
     ): MethodDef {
         if (instructions.isNotEmpty()) utf8String("Code")
         return methodDef(access, utf8String(methodName), utf8String(methodSig), instructions)
@@ -133,7 +135,7 @@ class ClassBuilder {
                 ushort(1u) // attribute count method
                 ushort(cpMap[ConstantPoolType.UTF8String("Code")]!!) // reference to Code attribute
                 val instWriter = ByteCodeWriter()
-                method.instructions.forEach { it.write(instWriter, cpMap) }
+                method.instructions.forEach { block -> block.instructions.forEach { it.write(instWriter, cpMap) } }
                 val instBytes = instWriter.toByteArray()
 
                 uint((instBytes.size + 12).toUInt()) // code attribute bytes count
@@ -166,14 +168,16 @@ class ClassBuilder {
                 dsl.init()
                 check(dsl.name.isNotEmpty())
                 check(dsl.signature.isNotEmpty())
-                val methodDef = methodDef(dsl.access, dsl.name, dsl.signature, methodDsl.instructions)
+                val methodDef = methodDef(dsl.access, dsl.name, dsl.signature, methodDsl.instructionBlocks)
                 methods.add(methodDef)
             }
         }
     }
 
     inner class MethodDSL(val parentDSL: ClassDSL.DSL) {
-        val instructions = mutableListOf<Instruction>()
+        //val instructions = mutableListOf<Instruction>()
+        val instructionBlocks = mutableListOf<InstructionBlock>()
+        var currentBlock: InstructionBlock? = null
 
         inner class DSL {
             val parent: ClassDSL.DSL get() = parentDSL
@@ -188,7 +192,11 @@ class ClassBuilder {
             }
 
             private fun add(instruction: Instruction) {
-                instructions.add(instruction)
+                val block : InstructionBlock = when (currentBlock) {
+                    null -> InstructionBlock().apply { instructionBlocks.add(this) }
+                    else -> currentBlock!!
+                }
+                block.instructions.add(instruction)
             }
 
             private fun getStatic(field: ConstantPoolType.FieldRef) = add(Instruction.OneArgumentPool(Opcode.GetStatic, field))
