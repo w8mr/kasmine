@@ -168,14 +168,42 @@ class ClassBuilder {
                 dsl.init()
                 check(dsl.name.isNotEmpty())
                 check(dsl.signature.isNotEmpty())
+                recalculateJumps(methodDsl)
                 val methodDef = methodDef(dsl.access, dsl.name, dsl.signature, methodDsl.instructionBlocks)
                 methods.add(methodDef)
+            }
+
+            private fun recalculateJumps(methodDsl: MethodDSL) {
+                methodDsl.instructionBlocks.forEachIndexed { index, block ->
+                    when (block.target) {
+                        null -> {}
+                        else -> {
+                            val targetIndex = methodDsl.instructionBlocks.indexOfFirst { it == block.target }
+                            if (targetIndex > index) {
+                                val jump =
+                                    ((index + 1 until targetIndex).sumOf { methodDsl.instructionBlocks[it].byteSize } + 3).toShort()
+                                when (val inst = block.instructions.last()) {
+                                    is Instruction.OneArgumentShort -> {
+                                        when (inst.opcode) {
+                                            Opcode.Goto, Opcode.IfNotEqual, Opcode.IfEqual -> block.instructions[block.instructions.size - 1] =
+                                                inst.copy(value = jump)
+
+                                            else -> error("should be jump")
+                                        }
+                                    }
+
+                                    else -> error("should be jump")
+                                }
+
+                            } else TODO("backwards jump")
+                        }
+                    }
+                }
             }
         }
     }
 
     inner class MethodDSL(val parentDSL: ClassDSL.DSL) {
-        //val instructions = mutableListOf<Instruction>()
         val instructionBlocks = mutableListOf<InstructionBlock>()
         var currentBlock: InstructionBlock? = null
 
@@ -192,11 +220,29 @@ class ClassBuilder {
             }
 
             private fun add(instruction: Instruction) {
-                val block : InstructionBlock = when (currentBlock) {
+                check(currentBlock?.target == null) { "Cannot add instruction to block which already has a target block"}
+                val block = when (val block = currentBlock) {
                     null -> InstructionBlock().apply { instructionBlocks.add(this) }
-                    else -> currentBlock!!
+                    else -> block
                 }
-                block.instructions.add(instruction)
+                block.add(instruction)
+                currentBlock = block
+            }
+
+            fun createTarget() = InstructionBlock()
+            fun insertInstructionBlock(codeBlock: InstructionBlock) {
+                instructionBlocks.add(codeBlock)
+                currentBlock = codeBlock
+            }
+            private fun addJump(instruction: Instruction, targetBlock: InstructionBlock = InstructionBlock()): InstructionBlock {
+                val block = when (val block = currentBlock) {
+                    null -> InstructionBlock().apply { instructionBlocks.add(this) }
+                    else -> block
+                }
+                block.add(instruction)
+                block.target = targetBlock
+                currentBlock = null
+                return targetBlock
             }
 
             private fun getStatic(field: ConstantPoolType.FieldRef) = add(Instruction.OneArgumentPool(Opcode.GetStatic, field))
@@ -239,9 +285,9 @@ class ClassBuilder {
                     5 -> iconst5()
                     -1 -> iconstm1()
                     in 6..127 -> bipush(value.toByte())
-                    in -2..-128 -> bipush(value.toByte())
+                    in -128..-2 -> bipush(value.toByte())
                     in 128..32767 -> sipush(value.toShort())
-                    in -129..-32768 -> sipush(value.toShort())
+                    in -32768..-129 -> sipush(value.toShort())
                     else -> loadConstant(constantInteger(value))
                 }
 
@@ -279,10 +325,13 @@ class ClassBuilder {
 
             fun pop() = add(Instruction.NoArgument(Opcode.Pop))
 
+            fun ifnotequal(targetBlock: InstructionBlock) = addJump(Instruction.OneArgumentShort(Opcode.IfNotEqual, 0), targetBlock)
             fun ifnotequal(jump: Short) = add(Instruction.OneArgumentShort(Opcode.IfNotEqual, jump))
 
+            fun ifequal(targetBlock: InstructionBlock) = addJump(Instruction.OneArgumentShort(Opcode.IfEqual, 0), targetBlock)
             fun ifequal(jump: Short) = add(Instruction.OneArgumentShort(Opcode.IfEqual, jump))
 
+            fun goto(targetBlock: InstructionBlock) = addJump(Instruction.OneArgumentShort(Opcode.Goto, 0),targetBlock)
             fun goto(jump: Short) = add(Instruction.OneArgumentShort(Opcode.Goto, jump))
         }
     }

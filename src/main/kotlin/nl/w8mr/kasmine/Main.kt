@@ -141,7 +141,7 @@ sealed class Opcode(val opcode: UByte, val name: String) {
 
     object IfNotEqual : Opcode(0x9au, "IfNotEqual")
 
-    object IfEqual : Opcode(0x99u, "IfNotEqual")
+    object IfEqual : Opcode(0x99u, "IfEqual")
 
     object Goto : Opcode(0xa7u, "Goto")
 }
@@ -151,8 +151,9 @@ class InstructionBlock {
     var byteSize: Int = 0
     var maxStack: Int = 0
     var currentStack: Int = 0
+    var target: InstructionBlock? = null
 
-    private fun add(instruction: Instruction) {
+    fun add(instruction: Instruction) {
         byteSize += instruction.byteSize
         instructions.add(instruction)
     }
@@ -161,8 +162,8 @@ class InstructionBlock {
 sealed interface Instruction {
     val opcode: Opcode
 
-    abstract val byteSize: Int
-    abstract fun write(
+    val byteSize: Int
+    fun write(
         out: ByteCodeWriter,
         cpMap: Map<ConstantPoolType, Int>,
     )
