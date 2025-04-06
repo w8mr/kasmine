@@ -179,23 +179,22 @@ class ClassBuilder {
                         null -> {}
                         else -> {
                             val targetIndex = methodDsl.instructionBlocks.indexOfFirst { it == block.target }
-                            if (targetIndex > index) {
-                                val jump =
-                                    ((index + 1 until targetIndex).sumOf { methodDsl.instructionBlocks[it].byteSize } + 3).toShort()
-                                when (val inst = block.instructions.last()) {
-                                    is Instruction.OneArgumentShort -> {
-                                        when (inst.opcode) {
-                                            Opcode.Goto, Opcode.IfNotEqual, Opcode.IfEqual -> block.instructions[block.instructions.size - 1] =
-                                                inst.copy(value = jump)
+                            val jump = if (targetIndex > index) {
+                                ((index + 1 until targetIndex).sumOf { methodDsl.instructionBlocks[it].byteSize } + 3).toShort()
+                            } else {
+                                (-(targetIndex .. index).sumOf { methodDsl.instructionBlocks[it].byteSize } + 3).toShort()
+                            }
+                            when (val inst = block.instructions.last()) {
+                                is Instruction.OneArgumentShort -> {
+                                    when (inst.opcode) {
+                                        Opcode.Goto, Opcode.IfNotEqual, Opcode.IfEqual -> block.instructions[block.instructions.size - 1] =
+                                            inst.copy(value = jump)
 
-                                            else -> error("should be jump")
-                                        }
+                                        else -> error("should be jump")
                                     }
-
-                                    else -> error("should be jump")
                                 }
-
-                            } else TODO("backwards jump")
+                                else -> error("should be jump")
+                            }
                         }
                     }
                 }

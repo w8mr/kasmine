@@ -310,8 +310,13 @@ class ByteCodeWriter {
     }
 
     fun short(value: Short) {
-        out.write(if (value < 0) (value.toInt() shr 8) and 128 else (value.toInt() shr 8))
-        out.write(value.toInt())
+        if (value<0) {
+            out.write((65536 + value.toInt()) shr 8)
+            out.write((65536 + value.toInt()) and 255)
+        } else {
+            out.write(value.toInt() shr 8)
+            out.write(value.toInt())
+        }
     }
 
     fun uint(value: UInt) {
