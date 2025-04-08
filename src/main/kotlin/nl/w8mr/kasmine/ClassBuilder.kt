@@ -274,6 +274,8 @@ class ClassBuilder {
 
             fun loadConstant(string: String) = loadConstant(constantString(string))
 
+            fun loadConstant(value: Char) = loadConstant(value.code)
+
             fun loadConstant(value: Int) =
                 when (value) {
                     0 -> iconst0()
