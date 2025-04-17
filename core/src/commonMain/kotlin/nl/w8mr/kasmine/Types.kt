@@ -1,8 +1,6 @@
 package nl.w8mr.kasmine
 
-import java.io.ByteArrayOutputStream
-import java.io.File
-
+// Common utility functions
 fun String.decodeHex(): ByteArray {
     val trimmed = this.replace(Regex("\\s+"), "")
     check(trimmed.length % 2 == 0) { "Must have an even length" }
@@ -22,7 +20,7 @@ sealed class ConstantPoolType {
         ) {
             with(out) {
                 +"01"
-                val bytes = value.toByteArray(Charsets.UTF_8)
+                val bytes = value.encodeToByteArray()
                 ushort(bytes.size)
                 write(bytes)
             }
@@ -161,13 +159,12 @@ class InstructionBlock {
 
 sealed interface Instruction {
     val opcode: Opcode
-
     val byteSize: Int
+
     fun write(
         out: ByteCodeWriter,
         cpMap: Map<ConstantPoolType, Int>,
     )
-
 
     interface OneArgument<T: Any>: Instruction {
         val value: T
@@ -280,82 +277,18 @@ data class ClassDef(val access: UShort, val classRef: ConstantPoolType.ClassEntr
 
 data class MethodDef(val access: UShort, val methodName: ConstantPoolType.UTF8String, val methodSig: ConstantPoolType.UTF8String, val instructions: List<InstructionBlock>)
 
-class ByteCodeWriter {
-    private val out = ByteArrayOutputStream()
-
-    operator fun String.unaryPlus() {
-        out.writeBytes(this.decodeHex())
-    }
-
-    fun write(bytes: ByteArray) {
-        out.write(bytes)
-    }
-
-    fun byte(value: Byte) {
-        out.write(value.toInt())
-    }
-
-    fun ubyte(value: UByte) {
-        out.write(value.toInt())
-    }
-
-    fun ushort(value: Int) {
-        assert(value <= UShort.MAX_VALUE.toInt())
-        ushort(value.toUShort())
-    }
-
-    fun ushort(value: UShort) {
-        out.write(value.toInt() shr 8)
-        out.write(value.toInt())
-    }
-
-    fun short(value: Short) {
-        if (value<0) {
-            out.write((65536 + value.toInt()) shr 8)
-            out.write((65536 + value.toInt()) and 255)
-        } else {
-            out.write(value.toInt() shr 8)
-            out.write(value.toInt())
-        }
-    }
-
-    fun uint(value: UInt) {
-        out.write((value shr 24).toInt())
-        out.write((value shr 16).toInt())
-        out.write((value shr 8).toInt())
-        out.write((value shr 0).toInt())
-    }
-
-    fun instructionOneArgument(
-        opcode: String,
-        value: Int,
-    ) {
-        +opcode
-        ushort(value)
-    }
-
-    fun instructionTwoArgument(
-        opcode: String,
-        value1: Int,
-        value2: Int,
-    ) {
-        +opcode
-        ushort(value1)
-        ushort(value2)
-    }
-
-    fun toByteArray() = out.toByteArray()
+// Platform-independent ByteCodeWriter interface
+expect class ByteCodeWriter() {
+    operator fun String.unaryPlus()
+    fun write(bytes: ByteArray)
+    fun byte(value: Byte)
+    fun ubyte(value: UByte)
+    fun ushort(value: Int)
+    fun ushort(value: UShort)
+    fun short(value: Short)
+    fun uint(value: UInt)
+    fun instructionOneArgument(opcode: String, value: Int)
+    fun instructionTwoArgument(opcode: String, value1: Int, value2: Int)
+    fun toByteArray(): ByteArray
 }
 
-class DynamicClassLoader(parent: ClassLoader?) : ClassLoader(parent) {
-    fun define(
-        className: String?,
-        bytecode: ByteArray,
-    ): Class<*> {
-        return super.defineClass(className, bytecode, 0, bytecode.size)
-    }
-}
-
-/*
-https://medium.com/@davethomas_9528/writing-hello-world-in-java-byte-code-34f75428e0ad
- */

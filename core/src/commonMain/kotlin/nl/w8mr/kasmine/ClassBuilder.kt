@@ -337,3 +337,8 @@ class ClassBuilder {
         }
     }
 }
+
+
+/*
+https://medium.com/@davethomas_9528/writing-hello-world-in-java-byte-code-34f75428e0ad
+ */
