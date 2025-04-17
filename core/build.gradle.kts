@@ -2,6 +2,10 @@ plugins {
     kotlin("multiplatform")
 }
 
+group = parent?.group ?: group
+version = parent?.version ?: version
+
+
 kotlin {
     jvm()
 
