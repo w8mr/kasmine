@@ -356,34 +356,6 @@ class DynamicClassLoader(parent: ClassLoader?) : ClassLoader(parent) {
     }
 }
 
-fun main() {
-    val clazz =
-        classBuilder {
-            name = "Script"
-            method {
-                name = "main"
-                signature = "([Ljava/lang/String;)V"
-                getStatic("java/lang/System", "out", "Ljava/io/PrintStream;")
-                loadConstant("Hello World")
-                invokeVirtual("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
-                `return`()
-            }
-        }
-    val bytes = clazz.write()
-    File("/Users/TU23DC/Script.class").writeBytes(bytes)
-
-    val actual = bytes.toHex()
-    val expected =
-        "cafebabe0000003400160100106a6176612f6c616e672f53797374656d0700010100036f75740100154c6a6176612f696f2f5072696e7453747265616d3b0c00030004090002000501000b48656c6c6f20576f726c640800070100136a6176612f696f2f5072696e7453747265616d0700090100077072696e746c6e010015284c6a6176612f6c616e672f537472696e673b29560c000b000c0a000a000d010004436f64650100046d61696e010016285b4c6a6176612f6c616e672f537472696e673b295601000a48656c6c6f576f726c640700120100106a6176612f6c616e672f4f626a6563740700140021001300150000000000010009001000110001000f00000015000a000a00000009b200061208b6000eb1000000000000"
-    println(actual)
-    println(expected)
-    check(expected.startsWith(actual))
-
-    val loader = DynamicClassLoader(Thread.currentThread().contextClassLoader)
-    val ScriptClass = loader.define("Script", bytes)
-    ScriptClass.getMethod("main", Array<String>::class.java).invoke(null, null)
-}
-
 /*
 https://medium.com/@davethomas_9528/writing-hello-world-in-java-byte-code-34f75428e0ad
  */
