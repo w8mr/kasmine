@@ -7,7 +7,17 @@ version = parent?.version ?: version
 
 
 kotlin {
-    jvm()
+    jvm {
+        java {
+            toolchain {
+                languageVersion.set(JavaLanguageVersion.of(11))
+            }
+        }
+    }
+    js {
+        browser()
+        nodejs()
+    }
 
     sourceSets {
         val commonMain by getting {

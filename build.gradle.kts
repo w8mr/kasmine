@@ -3,12 +3,12 @@ import com.vanniktech.maven.publish.KotlinMultiplatform
 import com.vanniktech.maven.publish.SonatypeHost
 
 plugins {
-    kotlin("multiplatform") version "2.1.10"
+    kotlin("multiplatform") version "2.1.10" apply false
     id("com.vanniktech.maven.publish") version "0.31.0"
 }
 
 group = "nl.w8mr.kasmine"
-version = "0.0.3"
+version = "0.0.4"
 
 allprojects {
     repositories {
@@ -28,7 +28,7 @@ subprojects {
         )
         publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
 
-        coordinates("nl.w8mr.kasmine", "core", "0.0.3")
+        coordinates("nl.w8mr.kasmine", "core", "0.0.4")
 
         pom {
             name.set("Kasmine Core")
