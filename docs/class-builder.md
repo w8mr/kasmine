@@ -60,59 +60,89 @@ method {
 
     parameter("args")   // optional — declares a local variable slot
 
-    instructionBlock {
-        // bytecode instructions
-    }
+    // bytecode instructions go here
 }
 ```
 
-### `instructionBlock` block
+### Grouping blocks
+
+Use `block { }` to group instructions. It returns a `BlockRef` pointing to that block's start:
 
 ```kotlin
-instructionBlock {
-    +Opcode.IConst0           // push 0 onto stack
-    +Opcode.Return            // return void
+val init = block {
+    loadConstant(0)
+    istore("x")
 }
 ```
+
+`instructionBlock { }` is also available and works identically. Both are optional — you can write instructions directly in the method scope.
 
 ## Control Flow
 
 ### Labels / Jump Targets
 
-Use `createTarget()` to create a target block, then reference it in branch instructions:
+Use `label()` to create a named target, then fill it with `labelName { }`:
 
 ```kotlin
-val loop = createTarget()
-val end = createTarget()
+val end = label()
 
-instructionBlock {
-    iconst0()
-    istore("i")
-}
+loadConstant(0)
+istore("x")
+iload("x")
+ifequal(end)
+loadConstant(-1)
+ireturn()
 
-// loop block
-insertInstructionBlock(loop)
-instructionBlock {
-    // ... loop body
-    iload("i")
-    iconst1()
-    iadd()
-    istore("i")
-    iload("i")
-    iconst5()
-    if_icmpne(loop) // jump back if i != 5
+end {
+    loadConstant(42)
+    ireturn()
 }
 ```
 
-Branch instructions that accept a target block:
+`block { }` groups instructions and returns a `BlockRef`, so you can assign a label in one step:
 
-| DSL Function | JVM Instruction |
-|---|---|
-| `ifequal(target)` | `ifeq` |
-| `ifnotequal(target)` | `ifne` |
-| `goto(target)` | `goto` |
+```kotlin
+val loop = block {
+    iload("x")
+    // ...
+    goto(loop)  // backward jump to self
+}
+```
+
+Inside any block, `self` is a `BlockRef` pointing to the current block. Useful for loops:
+
+```kotlin
+val loop = block {
+    iload("x")
+    iconst1()
+    iadd()
+    istore("x")
+    iload("x")
+    ifnotequal { self }  // jump back to loop head
+}
+```
+
+Branch instructions accept a `BlockRef` directly or via a lambda:
+
+```kotlin
+// Direct reference
+ifequal(end)
+goto(loop)
+
+// Lambda (lazy — useful for forward references)
+ifequal { end }
+goto { loop }
+```
+
+| DSL Function | JVM Instruction | Accepts |
+|---|---|---|
+| `ifequal(target)` | `ifeq` | `InstructionBlock`, `BlockRef`, `() -> BlockRef` |
+| `ifnotequal(target)` | `ifne` | `InstructionBlock`, `BlockRef`, `() -> BlockRef` |
+| `goto(target)` | `goto` | `InstructionBlock`, `BlockRef`, `() -> BlockRef` |
 
 Direct offset overloads are also available (`ifequal(offset: Short)`, etc.).
+
+The old `createTarget()` / `insertInstructionBlock()` / `goto(InstructionBlock)` API still works and is fully compatible.
 
 ## Instruction Methods
 
@@ -121,9 +151,9 @@ Direct offset overloads are also available (`ifequal(offset: Short)`, etc.).
 | DSL | JVM |
 |---|---|
 | `iconst(i: Int)` | `iconst_m1` through `iconst_5`, `bipush`, `sipush`, `ldc` (automatic) |
+| `loadConstant(i: Int)` | optimized short-form when possible |
 | `loadConstant(s: String)` | `ldc` (String) |
 | `loadConstant(c: Char)` | `ldc` (Integer with char code) |
-| `loadConstant(i: Int)` | optimized short-form when possible |
 | `dup()` | `dup` |
 | `pop()` | `pop` |
 

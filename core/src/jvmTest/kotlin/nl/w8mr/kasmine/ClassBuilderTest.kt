@@ -69,7 +69,6 @@ class ClassBuilderTest {
             }
         }
         val bytes = myClass.write()
-        java.io.File("/tmp/BranchExec.class").writeBytes(bytes)
         val loader = DynamicClassLoader(null)
         val clazz = loader.define("BranchExec", bytes)
         val method = clazz.getMethod("run")
@@ -341,5 +340,190 @@ class ClassBuilderTest {
         assertEquals(-1, method.invoke(null, 0))
         assertEquals(1, method.invoke(null, 10))
         assertEquals(1, method.invoke(null, 5))
+    }
+
+    @Test
+    fun `label forward declaration with block bind`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "LabelBindTest"
+            method {
+                access = 9u
+                name = "run"
+                signature = "()I"
+
+                val end = label()
+
+                block {
+                    loadConstant(0)
+                    istore("x")
+                }
+
+                block {
+                    iload("x")
+                    ifequal(end)
+                    loadConstant(-1)
+                    ireturn()
+                }
+
+                end {
+                    loadConstant(42)
+                    ireturn()
+                }
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("LabelBindTest", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(42, method.invoke(null))
+    }
+
+    @Test
+    fun `block API backward branch with consistent frame`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "LoopTest"
+            method {
+                access = 9u
+                name = "run"
+                signature = "()I"
+
+                val end = label()
+                val loop = label()
+
+                block {
+                    loadConstant(0)
+                    istore("x")
+                    goto(loop)
+                }
+
+                loop {
+                    iload("x")
+                    ifnotequal(end)
+                    loadConstant(1)
+                    istore("x")
+                    goto(loop)
+                }
+
+                end {
+                    loadConstant(5)
+                    ireturn()
+                }
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("LoopTest", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(5, method.invoke(null))
+    }
+
+    @Test
+    fun `block direct reference and lazy reference both work`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "RefStyleTest"
+            method {
+                access = 9u
+                name = "run"
+                signature = "()I"
+
+                val end = label()
+
+                block {
+                    loadConstant(0)
+                    istore("x")
+                }
+
+                block {
+                    iload("x")
+                    ifequal(end)
+                    loadConstant(-1)
+                    ireturn()
+                }
+
+                end {
+                    loadConstant(99)
+                    ireturn()
+                }
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("RefStyleTest", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(99, method.invoke(null))
+    }
+
+    @Test
+    fun `lazy goto style with forward reference`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "LazyForwardTest"
+            method {
+                access = 9u
+                name = "run"
+                signature = "()I"
+
+                val end = label()
+
+                block {
+                    loadConstant(0)
+                    istore("x")
+                }
+
+                block {
+                    iload("x")
+                    ifequal { end }
+                    loadConstant(-1)
+                    ireturn()
+                }
+
+                end {
+                    loadConstant(7)
+                    ireturn()
+                }
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("LazyForwardTest", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(7, method.invoke(null))
+    }
+
+    @Test
+    fun `block API direct target reference`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "DirectRefTest"
+            method {
+                access = 9u
+                name = "run"
+                signature = "()I"
+
+                val end = label()
+
+                block {
+                    loadConstant(0)
+                    istore("x")
+                    iload("x")
+                    ifequal(end)
+                    loadConstant(-1)
+                    ireturn()
+                }
+
+                end {
+                    loadConstant(42)
+                    ireturn()
+                }
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("DirectRefTest", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(42, method.invoke(null))
     }
 }

@@ -152,12 +152,19 @@ sealed class Opcode(val opcode: UByte, val name: String) {
     object Goto : Opcode(0xa7u, "Goto")
 }
 
+class BlockRef {
+    var block: InstructionBlock? = null
+    val isBound: Boolean get() = block != null
+}
+
 class InstructionBlock {
     val instructions: MutableList<Instruction> = mutableListOf()
     var byteSize: Int = 0
     var maxStack: Int = 0
     var currentStack: Int = 0
     var target: InstructionBlock? = null
+    var jumpRef: (() -> BlockRef)? = null
+    var jumpTarget: BlockRef? = null
 
     fun add(instruction: Instruction) {
         byteSize += instruction.byteSize

@@ -119,7 +119,7 @@ class ClassBuilder {
     fun write(): ByteArray {
         val out = ByteCodeWriter()
 
-        val hasBranches = classDef.methods.any { m -> m.instructions.any { it.target != null } }
+        val hasBranches = classDef.methods.any { m -> m.instructions.any { it.target != null || it.jumpRef != null || it.jumpTarget != null } }
         val needsStackMap = classVersion >= 50 && hasBranches
         if (needsStackMap) {
             utf8String("StackMapTable")
@@ -165,10 +165,11 @@ class ClassBuilder {
                 )
                 val smtEntries = generator.generate()
                 val smtWriter = ByteCodeWriter()
-                if (classVersion >= 50 && smtEntries.isNotEmpty()) {
+                if (needsStackMap) {
                     generator.writeStackMap(smtWriter, cpMap, smtEntries)
                 }
                 val smtBytes = smtWriter.toByteArray()
+                val hasCodeAttr = smtBytes.isNotEmpty()
                 val codeAttrLen = (12 + instBytes.size + smtBytes.size).toUInt()
 
                 uint(codeAttrLen) // code attribute bytes count
@@ -177,7 +178,7 @@ class ClassBuilder {
                 uint(instBytes.size.toUInt()) // code block bytes count
                 out.write(instBytes)
                 ushort(0) // exception count
-                if (smtBytes.isNotEmpty()) {
+                if (hasCodeAttr) {
                     ushort(1) // attribute count method
                     out.write(smtBytes)
                 } else {
@@ -219,28 +220,45 @@ class ClassBuilder {
 
             private fun recalculateJumps(methodDsl: MethodDSL) {
                 methodDsl.instructionBlocks.forEachIndexed { index, block ->
-                    when (block.target) {
-                        null -> {}
-                        else -> {
-                            val targetIndex = methodDsl.instructionBlocks.indexOfFirst { it == block.target }
-                            val jump = if (targetIndex > index) {
-                                ((index + 1 until targetIndex).sumOf { methodDsl.instructionBlocks[it].byteSize } + 3).toShort()
-                            } else {
-                                (-(targetIndex .. index).sumOf { methodDsl.instructionBlocks[it].byteSize } + 3).toShort()
-                            }
-                            when (val inst = block.instructions.last()) {
-                                is Instruction.OneArgumentShort -> {
-                                    when (inst.opcode) {
-                                        Opcode.Goto, Opcode.IfNotEqual, Opcode.IfEqual -> block.instructions[block.instructions.size - 1] =
-                                            inst.copy(value = jump)
+                    block.jumpTarget?.let { targetRef ->
+                        val targetBlock = targetRef.block ?: error("Unbound BlockRef")
+                        val targetIndex = methodDsl.instructionBlocks.indexOfFirst { it === targetBlock }
+                        val jump = calculateJumpOffset(index, targetIndex, methodDsl.instructionBlocks)
+                        updateJumpInstruction(block, jump)
+                    }
+                    block.jumpRef?.let { targetLambda ->
+                        val targetRef = targetLambda()
+                        val targetBlock = targetRef.block ?: error("Unbound BlockRef")
+                        val targetIndex = methodDsl.instructionBlocks.indexOfFirst { it === targetBlock }
+                        val jump = calculateJumpOffset(index, targetIndex, methodDsl.instructionBlocks)
+                        updateJumpInstruction(block, jump)
+                    }
+                    block.target?.let { targetBlock ->
+                        val targetIndex = methodDsl.instructionBlocks.indexOfFirst { it === targetBlock }
+                        val jump = calculateJumpOffset(index, targetIndex, methodDsl.instructionBlocks)
+                        updateJumpInstruction(block, jump)
+                    }
+                }
+            }
 
-                                        else -> error("should be jump")
-                                    }
-                                }
-                                else -> error("should be jump")
-                            }
+            private fun calculateJumpOffset(fromIndex: Int, toIndex: Int, blocks: List<InstructionBlock>): Short {
+                return if (toIndex > fromIndex) {
+                    ((fromIndex + 1 until toIndex).sumOf { blocks[it].byteSize } + 3).toShort()
+                } else {
+                    (-(toIndex..fromIndex).sumOf { blocks[it].byteSize } + 3).toShort()
+                }
+            }
+
+            private fun updateJumpInstruction(block: InstructionBlock, jump: Short) {
+                when (val inst = block.instructions.last()) {
+                    is Instruction.OneArgumentShort -> {
+                        when (inst.opcode) {
+                            Opcode.Goto, Opcode.IfNotEqual, Opcode.IfEqual ->
+                                block.instructions[block.instructions.size - 1] = inst.copy(value = jump)
+                            else -> error("should be jump")
                         }
                     }
+                    else -> error("should be jump")
                 }
             }
         }
@@ -255,6 +273,8 @@ class ClassBuilder {
             lateinit var name: String
             lateinit var signature: String
             var access: UShort = 9u
+            var self: BlockRef = BlockRef()
+                private set
 
             private val localVarMap = mutableMapOf<String, UByte>()
 
@@ -409,7 +429,54 @@ class ClassBuilder {
             fun ifequal(jump: Short) = add(Instruction.OneArgumentShort(Opcode.IfEqual, jump))
 
             fun goto(targetBlock: InstructionBlock) = addJump(Instruction.OneArgumentShort(Opcode.Goto, 0),targetBlock)
-            fun goto(jump: Short) = add(Instruction.OneArgumentShort(Opcode.Goto, jump))
+            fun goto(jump: Short) = addJump(Instruction.OneArgumentShort(Opcode.Goto, jump))
+
+            // New block/label API
+
+            fun label(): BlockRef = BlockRef()
+
+            fun block(init: DSL.() -> Unit): BlockRef {
+                val ref = BlockRef().also { it.block = InstructionBlock() }
+                instructionBlocks.add(ref.block!!)
+                currentBlock = ref.block
+                val prev = self
+                self = ref
+                this.init()
+                self = prev
+                return ref
+            }
+
+            operator fun BlockRef.invoke(init: DSL.() -> Unit) {
+                val ib = InstructionBlock()
+                this.block = ib
+                instructionBlocks.add(ib)
+                currentBlock = ib
+                val prev = self
+                self = this
+                this@DSL.init()
+                self = prev
+            }
+
+            fun goto(target: BlockRef) = addJump(Instruction.OneArgumentShort(Opcode.Goto, 0)) { target }
+            fun goto(target: () -> BlockRef) = addJump(Instruction.OneArgumentShort(Opcode.Goto, 0), target)
+
+            fun ifequal(target: BlockRef) = addJump(Instruction.OneArgumentShort(Opcode.IfEqual, 0)) { target }
+            fun ifequal(target: () -> BlockRef) = addJump(Instruction.OneArgumentShort(Opcode.IfEqual, 0), target)
+
+            fun ifnotequal(target: BlockRef) = addJump(Instruction.OneArgumentShort(Opcode.IfNotEqual, 0)) { target }
+            fun ifnotequal(target: () -> BlockRef) = addJump(Instruction.OneArgumentShort(Opcode.IfNotEqual, 0), target)
+
+            private fun addJump(instruction: Instruction, target: () -> BlockRef) {
+                val block = currentBlock ?: InstructionBlock().also { instructionBlocks.add(it) }
+                block.add(instruction)
+                val ref = target()
+                if (ref.isBound) {
+                    block.jumpTarget = ref
+                } else {
+                    block.jumpRef = target
+                }
+                currentBlock = null
+            }
         }
     }
 }
