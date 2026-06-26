@@ -266,6 +266,8 @@ class ClassBuilder {
             lateinit var name: String
             lateinit var signature: String
             var access: UShort = 9u
+            var self: BlockRef = BlockRef()
+                private set
 
             private val localVarMap = mutableMapOf<String, UByte>()
 
@@ -289,8 +291,26 @@ class ClassBuilder {
                 val ib = InstructionBlock()
                 this.block = ib
                 instructionBlocks.add(ib)
+                val prevBlock = currentBlock
+                val prevSelf = self
                 currentBlock = ib
+                self = this
                 this@DSL.init()
+                currentBlock = prevBlock
+                self = prevSelf
+            }
+
+            fun block(init: DSL.() -> Unit): BlockRef {
+                val ref = BlockRef().also { it.block = InstructionBlock() }
+                instructionBlocks.add(ref.block!!)
+                val prevBlock = currentBlock
+                val prevSelf = self
+                currentBlock = ref.block
+                self = ref
+                this.init()
+                currentBlock = prevBlock
+                self = prevSelf
+                return ref
             }
 
             private fun getStatic(field: ConstantPoolType.FieldRef) = add(Instruction.OneArgumentPool(Opcode.GetStatic, field))

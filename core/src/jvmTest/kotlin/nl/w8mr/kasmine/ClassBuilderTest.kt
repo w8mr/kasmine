@@ -498,4 +498,36 @@ class ClassBuilderTest {
         assertEquals(42, method.invoke(null))
     }
 
+    @Test
+    fun `block with self reference`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "BlockSelf"
+            method {
+                access = 9u
+                name = "run"
+                signature = "()I"
+                val end = label()
+                loadConstant(0)
+                istore("x")
+
+                val loop = block {
+                    iload("x")
+                    ifequal(end)
+                    goto(self)
+                }
+
+                goto(loop)
+                end {
+                    loadConstant(42)
+                    ireturn()
+                }
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("BlockSelf", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(42, method.invoke(null))
+    }
 }
