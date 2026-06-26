@@ -64,24 +64,11 @@ method {
 }
 ```
 
-### Grouping blocks
-
-Use `block { }` to group instructions. It returns a `BlockRef` pointing to that block's start:
-
-```kotlin
-val init = block {
-    loadConstant(0)
-    istore("x")
-}
-```
-
-`instructionBlock { }` is also available and works identically. Both are optional — you can write instructions directly in the method scope.
-
 ## Control Flow
 
 ### Labels / Jump Targets
 
-Use `label()` to create a named target, then fill it with `labelName { }`:
+Use `label()` to create a forward reference, then bind it with `labelName { }`:
 
 ```kotlin
 val end = label()
@@ -89,7 +76,7 @@ val end = label()
 loadConstant(0)
 istore("x")
 iload("x")
-ifequal(end)
+ifequal(end)       // forward reference — end block hasn't been created yet
 loadConstant(-1)
 ireturn()
 
@@ -99,30 +86,7 @@ end {
 }
 ```
 
-`block { }` groups instructions and returns a `BlockRef`, so you can assign a label in one step:
-
-```kotlin
-val loop = block {
-    iload("x")
-    // ...
-    goto(loop)  // backward jump to self
-}
-```
-
-Inside any block, `self` is a `BlockRef` pointing to the current block. Useful for loops:
-
-```kotlin
-val loop = block {
-    iload("x")
-    iconst1()
-    iadd()
-    istore("x")
-    iload("x")
-    ifnotequal { self }  // jump back to loop head
-}
-```
-
-Branch instructions accept a `BlockRef` directly or via a lambda:
+`label()` returns a `BlockRef`. Pass it directly to branch instructions, or use a lambda for lazy resolution:
 
 ```kotlin
 // Direct reference
@@ -134,15 +98,35 @@ ifequal { end }
 goto { loop }
 ```
 
+For backward jumps, the target block is already defined, so both forms work:
+
+```kotlin
+val loop = label()
+
+loadConstant(0)
+istore("x")
+goto(loop)
+
+loop {
+    iload("x")
+    ifnotequal(end)
+    loadConstant(1)
+    istore("x")
+    goto(loop)       // backward jump — loop is already bound
+}
+
+val end = label()
+loadConstant(5)
+ireturn()
+```
+
 | DSL Function | JVM Instruction | Accepts |
 |---|---|---|
-| `ifequal(target)` | `ifeq` | `InstructionBlock`, `BlockRef`, `() -> BlockRef` |
-| `ifnotequal(target)` | `ifne` | `InstructionBlock`, `BlockRef`, `() -> BlockRef` |
-| `goto(target)` | `goto` | `InstructionBlock`, `BlockRef`, `() -> BlockRef` |
+| `ifequal(target)` | `ifeq` | `BlockRef`, `() -> BlockRef` |
+| `ifnotequal(target)` | `ifne` | `BlockRef`, `() -> BlockRef` |
+| `goto(target)` | `goto` | `BlockRef`, `() -> BlockRef` |
 
 Direct offset overloads are also available (`ifequal(offset: Short)`, etc.).
-
-The old `createTarget()` / `insertInstructionBlock()` / `goto(InstructionBlock)` API still works and is fully compatible.
 
 ## Instruction Methods
 

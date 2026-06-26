@@ -1,7 +1,5 @@
 package nl.w8mr.kasmine
 
-import kotlin.apply
-
 fun classBuilder(init: ClassBuilder.ClassDSL.DSL.() -> Unit): ClassBuilder {
     val builder = ClassBuilder()
     builder.classDef(init)
@@ -119,7 +117,7 @@ class ClassBuilder {
     fun write(): ByteArray {
         val out = ByteCodeWriter()
 
-        val hasBranches = classDef.methods.any { m -> m.instructions.any { it.target != null || it.jumpRef != null || it.jumpTarget != null } }
+        val hasBranches = classDef.methods.any { m -> m.instructions.any { it.jumpRef != null || it.jumpTarget != null } }
         val needsStackMap = classVersion >= 50 && hasBranches
         if (needsStackMap) {
             utf8String("StackMapTable")
@@ -233,11 +231,6 @@ class ClassBuilder {
                         val jump = calculateJumpOffset(index, targetIndex, methodDsl.instructionBlocks)
                         updateJumpInstruction(block, jump)
                     }
-                    block.target?.let { targetBlock ->
-                        val targetIndex = methodDsl.instructionBlocks.indexOfFirst { it === targetBlock }
-                        val jump = calculateJumpOffset(index, targetIndex, methodDsl.instructionBlocks)
-                        updateJumpInstruction(block, jump)
-                    }
                 }
             }
 
@@ -273,8 +266,6 @@ class ClassBuilder {
             lateinit var name: String
             lateinit var signature: String
             var access: UShort = 9u
-            var self: BlockRef = BlockRef()
-                private set
 
             private val localVarMap = mutableMapOf<String, UByte>()
 
@@ -287,29 +278,19 @@ class ClassBuilder {
             }
 
             private fun add(instruction: Instruction) {
-                check(currentBlock?.target == null) { "Cannot add instruction to block which already has a target block"}
-                val block = when (val block = currentBlock) {
-                    null -> InstructionBlock().apply { instructionBlocks.add(this) }
-                    else -> block
-                }
+                val block = currentBlock ?: InstructionBlock().apply { instructionBlocks.add(this) }
                 block.add(instruction)
                 currentBlock = block
             }
 
-            fun createTarget() = InstructionBlock()
-            fun insertInstructionBlock(codeBlock: InstructionBlock) {
-                instructionBlocks.add(codeBlock)
-                currentBlock = codeBlock
-            }
-            private fun addJump(instruction: Instruction, targetBlock: InstructionBlock = InstructionBlock()): InstructionBlock {
-                val block = when (val block = currentBlock) {
-                    null -> InstructionBlock().apply { instructionBlocks.add(this) }
-                    else -> block
-                }
-                block.add(instruction)
-                block.target = targetBlock
-                currentBlock = null
-                return targetBlock
+            fun label(): BlockRef = BlockRef()
+
+            operator fun BlockRef.invoke(init: DSL.() -> Unit) {
+                val ib = InstructionBlock()
+                this.block = ib
+                instructionBlocks.add(ib)
+                currentBlock = ib
+                this@DSL.init()
             }
 
             private fun getStatic(field: ConstantPoolType.FieldRef) = add(Instruction.OneArgumentPool(Opcode.GetStatic, field))
@@ -422,40 +403,11 @@ class ClassBuilder {
 
             fun pop() = add(Instruction.NoArgument(Opcode.Pop))
 
-            fun ifnotequal(targetBlock: InstructionBlock) = addJump(Instruction.OneArgumentShort(Opcode.IfNotEqual, 0), targetBlock)
             fun ifnotequal(jump: Short) = add(Instruction.OneArgumentShort(Opcode.IfNotEqual, jump))
 
-            fun ifequal(targetBlock: InstructionBlock) = addJump(Instruction.OneArgumentShort(Opcode.IfEqual, 0), targetBlock)
             fun ifequal(jump: Short) = add(Instruction.OneArgumentShort(Opcode.IfEqual, jump))
 
-            fun goto(targetBlock: InstructionBlock) = addJump(Instruction.OneArgumentShort(Opcode.Goto, 0),targetBlock)
-            fun goto(jump: Short) = addJump(Instruction.OneArgumentShort(Opcode.Goto, jump))
-
-            // New block/label API
-
-            fun label(): BlockRef = BlockRef()
-
-            fun block(init: DSL.() -> Unit): BlockRef {
-                val ref = BlockRef().also { it.block = InstructionBlock() }
-                instructionBlocks.add(ref.block!!)
-                currentBlock = ref.block
-                val prev = self
-                self = ref
-                this.init()
-                self = prev
-                return ref
-            }
-
-            operator fun BlockRef.invoke(init: DSL.() -> Unit) {
-                val ib = InstructionBlock()
-                this.block = ib
-                instructionBlocks.add(ib)
-                currentBlock = ib
-                val prev = self
-                self = this
-                this@DSL.init()
-                self = prev
-            }
+            fun goto(jump: Short) = add(Instruction.OneArgumentShort(Opcode.Goto, jump))
 
             fun goto(target: BlockRef) = addJump(Instruction.OneArgumentShort(Opcode.Goto, 0)) { target }
             fun goto(target: () -> BlockRef) = addJump(Instruction.OneArgumentShort(Opcode.Goto, 0), target)
@@ -480,8 +432,3 @@ class ClassBuilder {
         }
     }
 }
-
-
-/*
-https://medium.com/@davethomas_9528/writing-hello-world-in-java-byte-code-34f75428e0ad
- */

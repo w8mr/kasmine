@@ -11,6 +11,11 @@ class StackMapGeneratorTest {
         return b
     }
 
+    private fun InstructionBlock.jumpsTo(target: InstructionBlock) {
+        val ref = BlockRef().also { it.block = target }
+        this.jumpTarget = ref
+    }
+
     private fun generator(
         blocks: List<InstructionBlock>,
         sig: String = "()V",
@@ -26,7 +31,7 @@ class StackMapGeneratorTest {
     @Test fun `hasBranches true when target set`() {
         val target = InstructionBlock()
         val b = block(Instruction.NoArgument(Opcode.IConst0))
-        b.target = target
+        b.jumpsTo(target)
         val g = generator(listOf(b, target))
         assertTrue(g.hasBranches())
     }
@@ -42,7 +47,7 @@ class StackMapGeneratorTest {
         val target = InstructionBlock()
         target.add(Instruction.NoArgument(Opcode.Return))
         val main = block(Instruction.NoArgument(Opcode.IConst0))
-        main.target = target
+        main.jumpsTo(target)
         val g = generator(listOf(main, target), "()I", isStatic = true)
         assertEquals(1, g.generate().size)
     }
@@ -55,7 +60,7 @@ class StackMapGeneratorTest {
         main.add(Instruction.NoArgument(Opcode.IConst0))
         val ifeq = Instruction.OneArgumentShort(Opcode.IfEqual, 0)
         main.add(ifeq)
-        main.target = end
+        main.jumpsTo(end)
 
         val g = generator(listOf(main, end), "()I", isStatic = true)
         val entries = g.generate()
@@ -74,7 +79,7 @@ class StackMapGeneratorTest {
         main.add(Instruction.OneArgumentUByte(Opcode.ILoad, 0u))
         val ifeq = Instruction.OneArgumentShort(Opcode.IfEqual, 0)
         main.add(ifeq)
-        main.target = end
+        main.jumpsTo(end)
 
         val g = generator(listOf(main, end), "()I", isStatic = true)
         val entries = g.generate()
@@ -93,7 +98,7 @@ class StackMapGeneratorTest {
         main.add(Instruction.OneArgumentUByte(Opcode.IStore, 0u))
         val ifeq = Instruction.OneArgumentShort(Opcode.IfEqual, 0)
         main.add(ifeq)
-        main.target = end
+        main.jumpsTo(end)
 
         val g = generator(listOf(main, end), "()V", isStatic = true)
         val entries = g.generate()
@@ -110,7 +115,7 @@ class StackMapGeneratorTest {
         main.add(Instruction.OneArgumentUByte(Opcode.ALoad, 0u))
         val ifeq = Instruction.OneArgumentShort(Opcode.IfEqual, 0)
         main.add(ifeq)
-        main.target = end
+        main.jumpsTo(end)
 
         val g = generator(listOf(main, end), "()V", isStatic = true)
         val entries = g.generate()
@@ -125,7 +130,7 @@ class StackMapGeneratorTest {
         loopHeader.add(Instruction.NoArgument(Opcode.IConst0))
         val ifeq = Instruction.OneArgumentShort(Opcode.IfEqual, 0)
         loopHeader.add(ifeq)
-        loopHeader.target = loopBody
+        loopHeader.jumpsTo(loopBody)
         loopBody.add(Instruction.NoArgument(Opcode.Return))
 
         val g = generator(listOf(loopHeader, loopBody), "()I", isStatic = true)
@@ -144,12 +149,12 @@ class StackMapGeneratorTest {
         val block0 = InstructionBlock()
         block0.add(Instruction.NoArgument(Opcode.IConst0))
         block0.add(Instruction.OneArgumentShort(Opcode.IfEqual, 0))
-        block0.target = target1
+        block0.jumpsTo(target1)
 
         val block1 = InstructionBlock()
         block1.add(Instruction.NoArgument(Opcode.IConst0))
         block1.add(Instruction.OneArgumentShort(Opcode.IfEqual, 0))
-        block1.target = target2
+        block1.jumpsTo(target2)
 
         val g = generator(listOf(block0, block1, end, target1, target2), "()I", isStatic = true)
         val entries = g.generate()
@@ -164,7 +169,7 @@ class StackMapGeneratorTest {
         main.add(Instruction.NoArgument(Opcode.IConst0))
         val goto = Instruction.OneArgumentShort(Opcode.Goto, 0)
         main.add(goto)
-        main.target = target
+        main.jumpsTo(target)
 
         val fallthrough = InstructionBlock()
         fallthrough.add(Instruction.NoArgument(Opcode.IConst1))
@@ -182,7 +187,7 @@ class StackMapGeneratorTest {
         main.add(Instruction.NoArgument(Opcode.IConst0))
         val ifeq = Instruction.OneArgumentShort(Opcode.IfEqual, 0)
         main.add(ifeq)
-        main.target = end
+        main.jumpsTo(end)
 
         val g = generator(listOf(main, end), "()V", isStatic = false, className = "MyClass")
         val entries = g.generate()
@@ -198,7 +203,7 @@ class StackMapGeneratorTest {
         main.add(Instruction.NoArgument(Opcode.IConst0))
         val ifeq = Instruction.OneArgumentShort(Opcode.IfEqual, 0)
         main.add(ifeq)
-        main.target = end
+        main.jumpsTo(end)
 
         val g = generator(listOf(main, end), "()I", isStatic = true)
         val entries = g.generate()
@@ -215,7 +220,7 @@ class StackMapGeneratorTest {
         main.add(Instruction.NoArgument(Opcode.IConst0))
         val ifeq = Instruction.OneArgumentShort(Opcode.IfEqual, 0)
         main.add(ifeq)
-        main.target = end
+        main.jumpsTo(end)
 
         val g = generator(listOf(main, end), "()I", isStatic = true)
         val entries = g.generate()
@@ -247,7 +252,7 @@ class StackMapGeneratorTest {
         main.add(Instruction.NoArgument(Opcode.IConst0))
         val ifeq = Instruction.OneArgumentShort(Opcode.IfEqual, 0)
         main.add(ifeq)
-        main.target = end
+        main.jumpsTo(end)
 
         val g = generator(listOf(main, end), "()I", isStatic = true)
         val entries = g.generate()
@@ -264,7 +269,7 @@ class StackMapGeneratorTest {
         outerElse.add(Instruction.NoArgument(Opcode.IConst0))
         val innerIneq = Instruction.OneArgumentShort(Opcode.IfNotEqual, 0)
         outerElse.add(innerIneq)
-        outerElse.target = innerElse
+        outerElse.jumpsTo(innerElse)
         val afterInner = InstructionBlock()
         afterInner.add(Instruction.NoArgument(Opcode.IConst1))
         afterInner.add(Instruction.NoArgument(Opcode.IReturn))
@@ -276,7 +281,7 @@ class StackMapGeneratorTest {
         main.add(Instruction.NoArgument(Opcode.IConst0))
         val outerIneq = Instruction.OneArgumentShort(Opcode.IfNotEqual, 0)
         main.add(outerIneq)
-        main.target = outerElse
+        main.jumpsTo(outerElse)
 
         val g = generator(listOf(main, outerElse, innerElse, afterInner, end), "()I", isStatic = true)
         val entries = g.generate()

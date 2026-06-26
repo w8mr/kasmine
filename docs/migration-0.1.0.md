@@ -2,7 +2,7 @@
 
 ## New Label / Block API
 
-0.1.0 introduces a cleaner control-flow API based on `label()` and `block { }`, replacing the `createTarget()` / `insertInstructionBlock()` pair. The old API still works — migration is optional.
+0.1.0 replaces `createTarget()` / `insertInstructionBlock()` / `instructionBlock { }` with a cleaner `label()` + lambda-based API.
 
 ### `createTarget()` → `label()`
 
@@ -20,7 +20,7 @@ val end = label()
 end { /* instructions at target */ }
 ```
 
-### `insertInstructionBlock()` → `block { }` or `label { }`
+### `insertInstructionBlock()` → `label { }`
 
 **Before (0.0.5):**
 
@@ -29,7 +29,7 @@ val loop = createTarget()
 val end = createTarget()
 
 insertInstructionBlock(loop)
-iconst0()
+loadConstant(0)
 istore("i")
 
 // loop body
@@ -49,11 +49,9 @@ insertInstructionBlock(end)
 val loop = label()
 val end = label()
 
-block {
-    iconst0()
-    istore("i")
-    goto(loop)
-}
+loadConstant(0)
+istore("i")
+goto(loop)
 
 loop {
     iload("i")
@@ -68,60 +66,24 @@ end { /* ... */ }
 
 ### `instructionBlock { }` wrappers
 
-`instructionBlock { }` wrappers that exist solely to group code after `insertInstructionBlock` are no longer necessary. Use `block { }` for explicit grouping, or skip it entirely and let `label { }` hold the code:
+`instructionBlock { }` wrappers are no longer needed. Write instructions directly in the method scope:
 
 **Before:**
 
 ```kotlin
-val after = createTarget()
-ifequal(after)
-loadConstant(-1)
-ireturn()
-insertInstructionBlock(after)
+insertInstructionBlock(target)
 instructionBlock {
     loadConstant(42)
     ireturn()
 }
 ```
 
-**After (equivalent):**
+**After:**
 
 ```kotlin
-val after = label()
-ifequal(after)
-loadConstant(-1)
-ireturn()
-after {
+target {
     loadConstant(42)
     ireturn()
-}
-```
-
-### `BlockRef` return value from `block { }`
-
-`block { }` returns a `BlockRef` pointing to that block, so you can assign it in one step:
-
-```kotlin
-val loop = block {
-    // loop body
-}
-// loop can now be used in branch instructions
-goto(loop)
-```
-
-### `self` for self-referencing blocks
-
-Inside a `block { }` or `label { }` body, `self` is a `BlockRef` pointing to the current block:
-
-```kotlin
-loop {
-    iload("x")
-    iconst1()
-    iadd()
-    istore("x")
-    iload("x")
-    iconst5()
-    if_icmpeq { self }  // jump back to loop head
 }
 ```
 
@@ -132,26 +94,22 @@ Branch instructions accept either a `BlockRef` directly or a lambda `{ BlockRef 
 ```kotlin
 // Direct
 ifequal(end)
-goto(end)
 
-// Lambda (lazy)
+// Lambda (lazy — useful for forward references)
 ifequal { end }
-goto { end }
 ```
-
-The lambda style is useful for forward references where `end` is declared before its target block.
 
 ## What Changed
 
 | Old (0.0.5) | New (0.1.0) | Status |
 |---|---|---|
-| `createTarget()` | `label()` | **New** — old API still works |
-| `insertInstructionBlock(target)` | `target { }` or `block { }` | **New** — old API still works |
-| `instructionBlock { }` | `block { }` (optional wrapper) | **Still works** |
-| `goto(target)`, `ifequal(target)` | `goto(ref)`, `ifequal(ref)` + lambda overloads | **Extended** — old forms still work |
-| — | `self` inside blocks | **New** |
-| — | `block { }` returns `BlockRef` | **New** |
+| `createTarget()` | `label()` | **Replaced** |
+| `insertInstructionBlock(target)` | `target { }` | **Replaced** |
+| `instructionBlock { }` | direct method scope | **Removed** |
+| `block { }` | `label()` + `label { }` | **Removed** |
+| `self` | — | **Removed** |
+| `goto(target)`, `ifequal(target)` (`InstructionBlock`) | `goto(ref)`, `ifequal(ref)` (`BlockRef` or lambda) | **Replaced** |
 
 ## Compatibility
 
-All 0.0.5 code continues to compile and run unchanged under 0.1.0. There are no breaking changes to any existing API.
+0.0.5 code using the old API (`createTarget`, `insertInstructionBlock`, `instructionBlock { }`, `goto(InstructionBlock)`) will need updating. The changes are mechanical and covered in the examples above.

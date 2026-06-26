@@ -162,7 +162,6 @@ class InstructionBlock {
     var byteSize: Int = 0
     var maxStack: Int = 0
     var currentStack: Int = 0
-    var target: InstructionBlock? = null
     var jumpRef: (() -> BlockRef)? = null
     var jumpTarget: BlockRef? = null
 
@@ -171,6 +170,8 @@ class InstructionBlock {
         instructions.add(instruction)
     }
 }
+
+
 
 typealias TypeResolver = (ConstantPoolType) -> VerificationType
 

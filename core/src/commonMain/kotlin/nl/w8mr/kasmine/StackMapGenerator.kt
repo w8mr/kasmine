@@ -18,7 +18,7 @@ class StackMapGenerator(
     var maxLocals: Int = 0
         private set
 
-    fun hasBranches(): Boolean = blocks.any { it.target != null || it.jumpRef != null || it.jumpTarget != null }
+    fun hasBranches(): Boolean = blocks.any { it.jumpRef != null || it.jumpTarget != null }
 
     private fun flattenInstructions(): List<FlatInstruction> {
         val result = mutableListOf<FlatInstruction>()
@@ -44,7 +44,6 @@ class StackMapGenerator(
     private fun branchTargets(): Set<Int> {
         val targets = mutableSetOf<Int>()
         blocks.forEach { block ->
-            block.target?.let { targets.add(findTargetOffset(it)) }
             block.jumpTarget?.let { it.block?.let { b -> targets.add(findTargetOffset(b)) } }
             block.jumpRef?.let { lambda ->
                 val ref = lambda()
@@ -205,7 +204,7 @@ class StackMapGenerator(
     ) {
         for (block in blocks) {
             if (block.instructions.lastOrNull() !== inst) continue
-            val targetBlock = block.jumpTarget?.block ?: block.jumpRef?.let { it().block } ?: block.target ?: continue
+            val targetBlock = block.jumpTarget?.block ?: block.jumpRef?.let { it().block } ?: continue
             val targetOff = findTargetOffset(targetBlock)
             val existing = framesAtTargets[targetOff]
             val targetFrame = frame.copy()
