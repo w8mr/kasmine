@@ -115,9 +115,17 @@ sealed class Opcode(val opcode: UByte, val name: String) {
 
     object LoadConstant : ByteShortOpcode(0x13u, 0x12u, "LoadConstant")
 
+    object GetField : Opcode(0xb4u, "GetField")
+
+    object PutField : Opcode(0xb5u, "PutField")
+
     object InvokeVirtual : Opcode(0xb6u, "InvokeVirtual")
 
+    object InvokeSpecial : Opcode(0xb7u, "InvokeSpecial")
+
     object InvokeStatic : Opcode(0xb8u, "InvokeStatic")
+
+    object New : Opcode(0xbbu, "New")
 
     object Return : Opcode(0xb1u, "Return")
 
@@ -273,7 +281,9 @@ sealed interface Instruction {
     }
 }
 
-data class ClassDef(val access: UShort, val classRef: ConstantPoolType.ClassEntry, val superClassRef: ConstantPoolType.ClassEntry, val methods: List<MethodDef>)
+data class FieldDef(val access: UShort, val name: ConstantPoolType.UTF8String, val type: ConstantPoolType.UTF8String)
+
+data class ClassDef(val access: UShort, val classRef: ConstantPoolType.ClassEntry, val superClassRef: ConstantPoolType.ClassEntry, val fields: List<FieldDef>, val methods: List<MethodDef>)
 
 data class MethodDef(val access: UShort, val methodName: ConstantPoolType.UTF8String, val methodSig: ConstantPoolType.UTF8String, val instructions: List<InstructionBlock>)
 

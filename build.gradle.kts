@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "nl.w8mr.kasmine"
-version = "0.0.4"
+version = "0.0.5"
 
 allprojects {
     repositories {
@@ -28,7 +28,7 @@ subprojects {
         )
         publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
 
-        coordinates("nl.w8mr.kasmine", "core", "0.0.4")
+        coordinates("nl.w8mr.kasmine", "core", "0.0.5")
 
         pom {
             name.set("Kasmine Core")

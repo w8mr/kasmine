@@ -66,9 +66,10 @@ class ClassBuilder {
             classEntry(
                 "java/lang/Object",
             ),
+        fields: List<FieldDef>,
         methods: List<MethodDef>,
     ): ClassDef {
-        classDef = ClassDef(access, classRef, superClassRef, methods)
+        classDef = ClassDef(access, classRef, superClassRef, fields, methods)
         return classDef
     }
 
@@ -76,8 +77,9 @@ class ClassBuilder {
         access: UShort,
         className: String,
         superClassName: String = "java/lang/Object",
+        fields: List<FieldDef> = emptyList(),
         methods: List<MethodDef>,
-    ) = classDef(access, classEntry(className), classEntry(superClassName), methods)
+    ) = classDef(access, classEntry(className), classEntry(superClassName), fields, methods)
 
     private fun methodDef(
         access: UShort,
@@ -101,7 +103,10 @@ class ClassBuilder {
         val dsl = classDsl.DSL()
         dsl.init()
         check(dsl.name.isNotEmpty())
-        return classDef(dsl.access, dsl.name, dsl.superClass, classDsl.methods)
+        val fieldDefs = classDsl.rawFields.map { (access, name, type) ->
+            FieldDef(access, utf8String(name), utf8String(type))
+        }
+        return classDef(dsl.access, dsl.name, dsl.superClass, fieldDefs, classDsl.methods)
     }
 
     private inline fun <reified T : ConstantPoolType> addToPool(element: T): T {
@@ -126,7 +131,13 @@ class ClassBuilder {
             ushort(cpMap[classDef.classRef]!!) // main class
             ushort(cpMap[classDef.superClassRef]!!) // main class super
             ushort(0u) // interface count
-            ushort(0u) // field count
+            ushort(classDef.fields.size) // field count
+            classDef.fields.forEach { field ->
+                ushort(field.access)
+                ushort(cpMap[field.name]!!)
+                ushort(cpMap[field.type]!!)
+                ushort(0) // attribute count
+            }
             ushort(classDef.methods.size) // method count
             classDef.methods.forEach { method ->
                 ushort(method.access)
@@ -156,11 +167,16 @@ class ClassBuilder {
 
     inner class ClassDSL {
         val methods = mutableListOf<MethodDef>()
+        val rawFields = mutableListOf<Triple<UShort, String, String>>()
 
         inner class DSL {
             lateinit var name: String
             var access: UShort = 33u
             var superClass: String = "java/lang/Object"
+
+            fun field(access: UShort = 2u, name: String, type: String) {
+                rawFields.add(Triple(access, name, type))
+            }
 
             fun method(init: MethodDSL.DSL.() -> Unit) {
                 val methodDsl = MethodDSL(this)
@@ -216,6 +232,10 @@ class ClassBuilder {
 
             private fun localVar(name: String): UByte {
                 return localVarMap.getOrPut(name) { localVarMap.size.toUByte() }
+            }
+
+            fun parameter(name: String) {
+                localVar(name)
             }
 
             private fun add(instruction: Instruction) {
@@ -300,6 +320,30 @@ class ClassBuilder {
                 type: String,
             ) = invokeVirtual(methodRef(className, methodName, type))
 
+            private fun invokeSpecial(method: ConstantPoolType.MethodRef) = add(Instruction.OneArgumentPool(Opcode.InvokeSpecial, method))
+
+            fun invokeSpecial(
+                className: String,
+                methodName: String,
+                type: String,
+            ) = invokeSpecial(methodRef(className, methodName, type))
+
+            private fun putField(field: ConstantPoolType.FieldRef) = add(Instruction.OneArgumentPool(Opcode.PutField, field))
+
+            fun putField(
+                className: String,
+                fieldName: String,
+                type: String,
+            ) = putField(fieldRef(className, fieldName, type))
+
+            private fun getField(field: ConstantPoolType.FieldRef) = add(Instruction.OneArgumentPool(Opcode.GetField, field))
+
+            fun getField(
+                className: String,
+                fieldName: String,
+                type: String,
+            ) = getField(fieldRef(className, fieldName, type))
+
             private fun invokeStatic(method: ConstantPoolType.MethodRef) = add(Instruction.OneArgumentPool(Opcode.InvokeStatic, method))
 
             fun invokeStatic(
@@ -307,6 +351,10 @@ class ClassBuilder {
                 methodName: String,
                 type: String,
             ) = invokeStatic(methodRef(className, methodName, type))
+
+            private fun `new`(clazz: ConstantPoolType.ClassEntry) = add(Instruction.OneArgumentPool(Opcode.New, clazz))
+
+            fun `new`(className: String) = `new`(classEntry(className))
 
             fun `return`() = add(Instruction.NoArgument(Opcode.Return))
 
