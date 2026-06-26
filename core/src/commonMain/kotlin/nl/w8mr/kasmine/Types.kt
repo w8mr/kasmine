@@ -165,6 +165,10 @@ class InstructionBlock {
     }
 }
 
+typealias TypeResolver = (ConstantPoolType) -> VerificationType
+
+data class TypeEffect(val pops: List<VerificationType>, val pushes: List<VerificationType>)
+
 sealed interface Instruction {
     val opcode: Opcode
     val byteSize: Int
@@ -173,6 +177,8 @@ sealed interface Instruction {
         out: ByteCodeWriter,
         cpMap: Map<ConstantPoolType, Int>,
     )
+
+    fun typeEffect(resolve: TypeResolver): TypeEffect
 
     interface OneArgument<T: Any>: Instruction {
         val value: T
@@ -192,6 +198,16 @@ sealed interface Instruction {
         }
 
         override val byteSize: Int = 1
+
+        override fun typeEffect(resolve: TypeResolver): TypeEffect = when (opcode) {
+            Opcode.IConstM1, Opcode.IConst0, Opcode.IConst1, Opcode.IConst2, Opcode.IConst3, Opcode.IConst4, Opcode.IConst5 -> TypeEffect(emptyList(), listOf(VerificationType.Integer))
+            Opcode.Dup -> TypeEffect(listOf(VerificationType.Top), listOf(VerificationType.Top, VerificationType.Top))
+            Opcode.Pop -> TypeEffect(listOf(VerificationType.Top), emptyList())
+            Opcode.Return -> TypeEffect(emptyList(), emptyList())
+            Opcode.IReturn -> TypeEffect(listOf(VerificationType.Integer), emptyList())
+            Opcode.AReturn -> TypeEffect(listOf(VerificationType.Top), emptyList())
+            else -> TypeEffect(emptyList(), emptyList())
+        }
     }
 
     data class OneArgumentUByte(override val opcode: Opcode, override val value: UByte) : OneArgument<UByte> {
@@ -205,6 +221,14 @@ sealed interface Instruction {
         }
 
         override val byteSize: Int = 2
+
+        override fun typeEffect(resolve: TypeResolver): TypeEffect = when (opcode) {
+            Opcode.ILoad -> TypeEffect(emptyList(), listOf(VerificationType.Integer))
+            Opcode.IStore -> TypeEffect(listOf(VerificationType.Integer), emptyList())
+            Opcode.ALoad -> TypeEffect(emptyList(), listOf(VerificationType.Top))
+            Opcode.AStore -> TypeEffect(listOf(VerificationType.Top), emptyList())
+            else -> TypeEffect(emptyList(), emptyList())
+        }
     }
 
     data class OneArgumentByte(override val opcode: Opcode, override val value: Byte) : OneArgument<Byte> {
@@ -218,6 +242,11 @@ sealed interface Instruction {
         }
 
         override val byteSize: Int = 2
+
+        override fun typeEffect(resolve: TypeResolver): TypeEffect = when (opcode) {
+            Opcode.BiPush -> TypeEffect(emptyList(), listOf(VerificationType.Integer))
+            else -> TypeEffect(emptyList(), emptyList())
+        }
     }
 
     data class OneArgumentShort(override val opcode: Opcode, override val value: Short) : OneArgument<Short> {
@@ -231,6 +260,13 @@ sealed interface Instruction {
         }
 
         override val byteSize: Int = 3
+
+        override fun typeEffect(resolve: TypeResolver): TypeEffect = when (opcode) {
+            Opcode.SiPush -> TypeEffect(emptyList(), listOf(VerificationType.Integer))
+            Opcode.Goto -> TypeEffect(emptyList(), emptyList())
+            Opcode.IfNotEqual, Opcode.IfEqual -> TypeEffect(listOf(VerificationType.Integer), emptyList())
+            else -> TypeEffect(emptyList(), emptyList())
+        }
     }
 
     data class OneArgumentUShort(override val opcode: Opcode, override val value: UShort) : OneArgument<UShort> {
@@ -244,6 +280,8 @@ sealed interface Instruction {
         }
 
         override val byteSize: Int = 3
+
+        override fun typeEffect(resolve: TypeResolver): TypeEffect = TypeEffect(emptyList(), emptyList())
     }
 
     data class OneArgumentPool(override val opcode: Opcode, override val value: ConstantPoolType) : OneArgument<ConstantPoolType> {
@@ -263,6 +301,36 @@ sealed interface Instruction {
         }
 
         override val byteSize: Int = 3
+
+        override fun typeEffect(resolve: TypeResolver): TypeEffect = when (opcode) {
+            Opcode.GetStatic -> TypeEffect(emptyList(), listOf(resolve(value)))
+            Opcode.GetField -> TypeEffect(listOf(VerificationType.Top), listOf(resolve(value)))
+            Opcode.PutField -> {
+                val fieldType = resolve(value)
+                TypeEffect(listOf(VerificationType.Top, fieldType), emptyList())
+            }
+            Opcode.InvokeVirtual, Opcode.InvokeSpecial -> {
+                val returnType = resolve(value)
+                val pops = if (returnType is VerificationType.Top) listOf(VerificationType.Top) else emptyList()
+                val pushes = if (returnType is VerificationType.Top) emptyList() else listOf(returnType)
+                TypeEffect(pops, pushes)
+            }
+            Opcode.InvokeStatic -> {
+                val returnType = resolve(value)
+                val pushes = if (returnType is VerificationType.Top) emptyList() else listOf(returnType)
+                TypeEffect(emptyList(), pushes)
+            }
+            Opcode.LoadConstant -> {
+                val t = when (value) {
+                    is ConstantPoolType.ConstantString -> VerificationType.Object("java/lang/String")
+                    is ConstantPoolType.ConstantInteger -> VerificationType.Integer
+                    else -> VerificationType.Top
+                }
+                TypeEffect(emptyList(), listOf(t))
+            }
+            Opcode.New -> TypeEffect(emptyList(), listOf(VerificationType.Uninitialized(0u)))
+            else -> TypeEffect(emptyList(), emptyList())
+        }
     }
 
     data class TwoArgumentPool(override val opcode: Opcode, override val value1: ConstantPoolType, override val value2: ConstantPoolType) : TwoArgument<ConstantPoolType, ConstantPoolType> {
@@ -278,6 +346,8 @@ sealed interface Instruction {
         }
 
         override val byteSize: Int = 5
+
+        override fun typeEffect(resolve: TypeResolver): TypeEffect = TypeEffect(emptyList(), emptyList())
     }
 }
 

@@ -1,0 +1,166 @@
+# Class Builder DSL
+
+The `ClassBuilder` provides a Kotlin DSL for constructing JVM classes programmatically.
+
+## Entry Point
+
+```kotlin
+val result = classBuilder {
+    // DSL scope
+}
+```
+
+Returns a `ClassBuilder` instance. Call `.write()` on it to produce the byte array.
+
+## DSL Reference
+
+### `classDef` block
+
+```kotlin
+classBuilder {
+    access = 33u     // ACC_PUBLIC | ACC_FINAL (default: 33u)
+    name = "MyClass" // internal class name (required)
+    superClass = "java/lang/Object" // default: java/lang/Object
+    version = 52     // class file version (default: 51, range: 45–65)
+
+    field(access = 2u, name = "count", type = "I")          // private int count
+    field(name = "name", type = "Ljava/lang/String;")       // default access (2u = private)
+
+    method {
+        // method definition (see below)
+    }
+}
+```
+
+### Version control
+
+Set the `version` property to control which JVM class file format is emitted:
+
+```kotlin
+classBuilder {
+    version = 49  // Java 5 — no StackMapTable
+    version = 50  // Java 6 — stack map frames optional (StackMapTable still emitted)
+    version = 51  // Java 7 — StackMapTable required for methods with branches (default)
+    version = 52  // Java 8
+    version = 65  // Java 21
+}
+```
+
+- **version ≤ 49**: StackMapTable is never emitted; class files pass verification on older JVMs
+- **version ≥ 50**: StackMapTable is emitted when any method contains branching instructions (ifeq, ifne, goto)
+- maxStack and maxLocals are always computed from dataflow analysis regardless of version
+
+### `method` block
+
+```kotlin
+method {
+    access = 9u        // ACC_PUBLIC | ACC_STATIC (default: 9u)
+    name = "main"      // method name (required)
+    signature = "()V"  // JVM descriptor (required)
+
+    parameter("args")   // optional — declares a local variable slot
+
+    instructionBlock {
+        // bytecode instructions
+    }
+}
+```
+
+### `instructionBlock` block
+
+```kotlin
+instructionBlock {
+    +Opcode.IConst0           // push 0 onto stack
+    +Opcode.Return            // return void
+}
+```
+
+## Control Flow
+
+### Labels / Jump Targets
+
+Use `createTarget()` to create a target block, then reference it in branch instructions:
+
+```kotlin
+val loop = createTarget()
+val end = createTarget()
+
+instructionBlock {
+    iconst0()
+    istore("i")
+}
+
+// loop block
+insertInstructionBlock(loop)
+instructionBlock {
+    // ... loop body
+    iload("i")
+    iconst1()
+    iadd()
+    istore("i")
+    iload("i")
+    iconst5()
+    if_icmpne(loop) // jump back if i != 5
+}
+```
+
+Branch instructions that accept a target block:
+
+| DSL Function | JVM Instruction |
+|---|---|
+| `ifequal(target)` | `ifeq` |
+| `ifnotequal(target)` | `ifne` |
+| `goto(target)` | `goto` |
+
+Direct offset overloads are also available (`ifequal(offset: Short)`, etc.).
+
+## Instruction Methods
+
+### Stack operations
+
+| DSL | JVM |
+|---|---|
+| `iconst(i: Int)` | `iconst_m1` through `iconst_5`, `bipush`, `sipush`, `ldc` (automatic) |
+| `loadConstant(s: String)` | `ldc` (String) |
+| `loadConstant(c: Char)` | `ldc` (Integer with char code) |
+| `loadConstant(i: Int)` | optimized short-form when possible |
+| `dup()` | `dup` |
+| `pop()` | `pop` |
+
+### Local variables
+
+| DSL | JVM |
+|---|---|
+| `iload(name)` | `iload` (with auto-assigned slot) |
+| `istore(name)` | `istore` |
+| `aload(name)` | `aload` |
+| `astore(name)` | `astore` |
+
+### Method invocation
+
+| DSL | JVM |
+|---|---|
+| `invokeVirtual(className, methodName, type)` | `invokevirtual` |
+| `invokeSpecial(className, methodName, type)` | `invokespecial` |
+| `invokeStatic(className, methodName, type)` | `invokestatic` |
+
+### Field access
+
+| DSL | JVM |
+|---|---|
+| `getStatic(className, fieldName, type)` | `getstatic` |
+| `getField(className, fieldName, type)` | `getfield` |
+| `putField(className, fieldName, type)` | `putfield` |
+
+### Object operations
+
+| DSL | JVM |
+|---|---|
+| `` `new`(className) `` | `new` |
+| `` `return`() `` | `return` (void) |
+| `ireturn()` | `ireturn` |
+| `areturn()` | `areturn` |
+
+### References to the constant pool
+
+Use `fieldRef(className, fieldName, type)` and `methodRef(className, methodName, type)` to obtain pool references for use with `getStatic` / `invokeVirtual` etc.

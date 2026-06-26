@@ -11,6 +11,7 @@ fun classBuilder(init: ClassBuilder.ClassDSL.DSL.() -> Unit): ClassBuilder {
 class ClassBuilder {
     private val constantPool = mutableMapOf<ConstantPoolType, Int>()
     lateinit var classDef: ClassDef
+    var classVersion: Int = 51
 
     private fun utf8String(value: String) = addToPool(ConstantPoolType.UTF8String(value))
 
@@ -103,6 +104,7 @@ class ClassBuilder {
         val dsl = classDsl.DSL()
         dsl.init()
         check(dsl.name.isNotEmpty())
+        classVersion = dsl.version
         val fieldDefs = classDsl.rawFields.map { (access, name, type) ->
             FieldDef(access, utf8String(name), utf8String(type))
         }
@@ -117,10 +119,16 @@ class ClassBuilder {
     fun write(): ByteArray {
         val out = ByteCodeWriter()
 
+        val hasBranches = classDef.methods.any { m -> m.instructions.any { it.target != null } }
+        val needsStackMap = classVersion >= 50 && hasBranches
+        if (needsStackMap) {
+            utf8String("StackMapTable")
+        }
+
         with(out) {
             +"cafebabe"
             ushort(0) // minor version
-            ushort(49) // major version
+            ushort(classVersion) // major version
             ushort(constantPool.size + 1) // constantPoolSize + 1
             val cpMap =
                 constantPool.entries.sortedByDescending { it.value }
@@ -149,13 +157,32 @@ class ClassBuilder {
                 method.instructions.forEach { block -> block.instructions.forEach { it.write(instWriter, cpMap) } }
                 val instBytes = instWriter.toByteArray()
 
-                uint((instBytes.size + 12).toUInt()) // code attribute bytes count
-                ushort(10u) // TODO: calc max stack size
-                ushort(10u) // TODO: calc max local var size
+                val generator = StackMapGenerator(
+                    blocks = method.instructions,
+                    methodSig = method.methodSig.value,
+                    isStatic = (method.access.toInt() and 0x0008) != 0,
+                    thisClassName = classDef.classRef.nameRef.value,
+                )
+                val smtEntries = generator.generate()
+                val smtWriter = ByteCodeWriter()
+                if (classVersion >= 50 && smtEntries.isNotEmpty()) {
+                    generator.writeStackMap(smtWriter, cpMap, smtEntries)
+                }
+                val smtBytes = smtWriter.toByteArray()
+                val codeAttrLen = (12 + instBytes.size + smtBytes.size).toUInt()
+
+                uint(codeAttrLen) // code attribute bytes count
+                ushort(generator.maxStack)
+                ushort(generator.maxLocals)
                 uint(instBytes.size.toUInt()) // code block bytes count
                 out.write(instBytes)
                 ushort(0) // exception count
-                ushort(0) // attribute count method
+                if (smtBytes.isNotEmpty()) {
+                    ushort(1) // attribute count method
+                    out.write(smtBytes)
+                } else {
+                    ushort(0) // attribute count method
+                }
             }
             ushort(0) // attribute count class
         }
@@ -173,6 +200,7 @@ class ClassBuilder {
             lateinit var name: String
             var access: UShort = 33u
             var superClass: String = "java/lang/Object"
+            var version: Int = 51
 
             fun field(access: UShort = 2u, name: String, type: String) {
                 rawFields.add(Triple(access, name, type))
