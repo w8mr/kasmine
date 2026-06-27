@@ -39,6 +39,44 @@ sealed class ConstantPoolType {
         }
     }
 
+    data class ConstantFloat(val value: Float) : ConstantPoolType() {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
+            with(out) {
+                +"04"
+                uint(value.toBits().toUInt())
+            }
+        }
+    }
+
+    data class ConstantLong(val value: Long) : ConstantPoolType() {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
+            with(out) {
+                +"05"
+                uint((value ushr 32).toUInt())
+                uint(value.toUInt())
+            }
+        }
+    }
+
+    data class ConstantDouble(val value: Double) : ConstantPoolType() {
+        override fun write(
+            out: ByteCodeWriter,
+            cpMap: Map<ConstantPoolType, Int>,
+        ) {
+            with(out) {
+                +"06"
+                uint((value.toBits() ushr 32).toUInt())
+                uint(value.toBits().toUInt())
+            }
+        }
+    }
+
     data class ClassEntry(val nameRef: UTF8String) : ConstantPoolType() {
         override fun write(
             out: ByteCodeWriter,
@@ -150,6 +188,27 @@ sealed class Opcode(val opcode: UByte, val name: String) {
     object IfEqual : Opcode(0x99u, "IfEqual")
 
     object Goto : Opcode(0xa7u, "Goto")
+
+    object LConst0 : Opcode(0x09u, "LConst0")
+    object LConst1 : Opcode(0x0au, "LConst1")
+    object FConst0 : Opcode(0x0bu, "FConst0")
+    object FConst1 : Opcode(0x0cu, "FConst1")
+    object FConst2 : Opcode(0x0du, "FConst2")
+    object DConst0 : Opcode(0x0eu, "DConst0")
+    object DConst1 : Opcode(0x0fu, "DConst1")
+
+    object LLoad : Opcode(0x16u, "LLoad")
+    object LStore : Opcode(0x37u, "LStore")
+    object FLoad : Opcode(0x17u, "FLoad")
+    object FStore : Opcode(0x38u, "FStore")
+    object DLoad : Opcode(0x18u, "DLoad")
+    object DStore : Opcode(0x39u, "DStore")
+
+    object LReturn : Opcode(0xadu, "LReturn")
+    object FReturn : Opcode(0xaeu, "FReturn")
+    object DReturn : Opcode(0xafu, "DReturn")
+
+    object LoadConstant2W : Opcode(0x14u, "LoadConstant2W")
 }
 
 class BlockRef {
@@ -209,10 +268,16 @@ sealed interface Instruction {
 
         override fun typeEffect(resolve: TypeResolver): TypeEffect = when (opcode) {
             Opcode.IConstM1, Opcode.IConst0, Opcode.IConst1, Opcode.IConst2, Opcode.IConst3, Opcode.IConst4, Opcode.IConst5 -> TypeEffect(emptyList(), listOf(VerificationType.Integer))
+            Opcode.LConst0, Opcode.LConst1 -> TypeEffect(emptyList(), listOf(VerificationType.Long))
+            Opcode.FConst0, Opcode.FConst1, Opcode.FConst2 -> TypeEffect(emptyList(), listOf(VerificationType.Float))
+            Opcode.DConst0, Opcode.DConst1 -> TypeEffect(emptyList(), listOf(VerificationType.Double))
             Opcode.Dup -> TypeEffect(listOf(VerificationType.Top), listOf(VerificationType.Top, VerificationType.Top))
             Opcode.Pop -> TypeEffect(listOf(VerificationType.Top), emptyList())
             Opcode.Return -> TypeEffect(emptyList(), emptyList())
             Opcode.IReturn -> TypeEffect(listOf(VerificationType.Integer), emptyList())
+            Opcode.LReturn -> TypeEffect(listOf(VerificationType.Long), emptyList())
+            Opcode.FReturn -> TypeEffect(listOf(VerificationType.Float), emptyList())
+            Opcode.DReturn -> TypeEffect(listOf(VerificationType.Double), emptyList())
             Opcode.AReturn -> TypeEffect(listOf(VerificationType.Top), emptyList())
             else -> TypeEffect(emptyList(), emptyList())
         }
@@ -233,6 +298,12 @@ sealed interface Instruction {
         override fun typeEffect(resolve: TypeResolver): TypeEffect = when (opcode) {
             Opcode.ILoad -> TypeEffect(emptyList(), listOf(VerificationType.Integer))
             Opcode.IStore -> TypeEffect(listOf(VerificationType.Integer), emptyList())
+            Opcode.LLoad -> TypeEffect(emptyList(), listOf(VerificationType.Long))
+            Opcode.LStore -> TypeEffect(listOf(VerificationType.Long), emptyList())
+            Opcode.FLoad -> TypeEffect(emptyList(), listOf(VerificationType.Float))
+            Opcode.FStore -> TypeEffect(listOf(VerificationType.Float), emptyList())
+            Opcode.DLoad -> TypeEffect(emptyList(), listOf(VerificationType.Double))
+            Opcode.DStore -> TypeEffect(listOf(VerificationType.Double), emptyList())
             Opcode.ALoad -> TypeEffect(emptyList(), listOf(VerificationType.Top))
             Opcode.AStore -> TypeEffect(listOf(VerificationType.Top), emptyList())
             else -> TypeEffect(emptyList(), emptyList())
@@ -332,6 +403,15 @@ sealed interface Instruction {
                 val t = when (value) {
                     is ConstantPoolType.ConstantString -> VerificationType.Object("java/lang/String")
                     is ConstantPoolType.ConstantInteger -> VerificationType.Integer
+                    is ConstantPoolType.ConstantFloat -> VerificationType.Float
+                    else -> VerificationType.Top
+                }
+                TypeEffect(emptyList(), listOf(t))
+            }
+            Opcode.LoadConstant2W -> {
+                val t = when (value) {
+                    is ConstantPoolType.ConstantLong -> VerificationType.Long
+                    is ConstantPoolType.ConstantDouble -> VerificationType.Double
                     else -> VerificationType.Top
                 }
                 TypeEffect(emptyList(), listOf(t))

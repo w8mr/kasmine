@@ -132,6 +132,9 @@ class StackMapGenerator(
             for (expectedPop in effect.pops) {
                 if (frame.stack.isNotEmpty()) {
                     frame.stack.removeAt(frame.stack.lastIndex)
+                    if (expectedPop.slots() == 2 && frame.stack.isNotEmpty() && frame.stack.last() is VerificationType.Top) {
+                        frame.stack.removeAt(frame.stack.lastIndex)
+                    }
                 }
             }
             for (push in effect.pushes) {
@@ -149,11 +152,53 @@ class StackMapGenerator(
                         frame.setLocal(localIdx, VerificationType.Integer)
                         maxLocals = maxOf(maxLocals, frame.locals.size)
                     }
+                    Opcode.LStore -> {
+                        frame.setLocal(localIdx, VerificationType.Long)
+                        if (localIdx + 1 >= frame.locals.size) {
+                            frame.setLocal(localIdx + 1, VerificationType.Top)
+                        }
+                        maxLocals = maxOf(maxLocals, frame.locals.size)
+                    }
+                    Opcode.FStore -> {
+                        frame.setLocal(localIdx, VerificationType.Float)
+                        maxLocals = maxOf(maxLocals, frame.locals.size)
+                    }
+                    Opcode.DStore -> {
+                        frame.setLocal(localIdx, VerificationType.Double)
+                        if (localIdx + 1 >= frame.locals.size) {
+                            frame.setLocal(localIdx + 1, VerificationType.Top)
+                        }
+                        maxLocals = maxOf(maxLocals, frame.locals.size)
+                    }
                     Opcode.AStore -> {
                         frame.setLocal(localIdx, VerificationType.Top)
                         maxLocals = maxOf(maxLocals, frame.locals.size)
                     }
                     Opcode.ILoad -> {
+                        if (frame.stack.isNotEmpty()) {
+                            val localType = frame.local(localIdx)
+                            if (localType !is VerificationType.Top) {
+                                frame.stack[frame.stack.lastIndex] = localType
+                            }
+                        }
+                    }
+                    Opcode.LLoad -> {
+                        if (frame.stack.isNotEmpty()) {
+                            val localType = frame.local(localIdx)
+                            if (localType !is VerificationType.Top) {
+                                frame.stack[frame.stack.lastIndex] = localType
+                            }
+                        }
+                    }
+                    Opcode.FLoad -> {
+                        if (frame.stack.isNotEmpty()) {
+                            val localType = frame.local(localIdx)
+                            if (localType !is VerificationType.Top) {
+                                frame.stack[frame.stack.lastIndex] = localType
+                            }
+                        }
+                    }
+                    Opcode.DLoad -> {
                         if (frame.stack.isNotEmpty()) {
                             val localType = frame.local(localIdx)
                             if (localType !is VerificationType.Top) {
@@ -186,7 +231,8 @@ class StackMapGenerator(
             }
 
             if (inst is Instruction.NoArgument &&
-                (inst.opcode == Opcode.Return || inst.opcode == Opcode.IReturn || inst.opcode == Opcode.AReturn)) {
+                (inst.opcode == Opcode.Return || inst.opcode == Opcode.IReturn || inst.opcode == Opcode.LReturn ||
+                 inst.opcode == Opcode.FReturn || inst.opcode == Opcode.DReturn || inst.opcode == Opcode.AReturn)) {
                 return
             }
 

@@ -156,8 +156,10 @@ Direct offset overloads are also available (`ifequal(offset: Short)`, etc.).
 
 | DSL | JVM |
 |---|---|
-| `iconst(i: Int)` | `iconst_m1` through `iconst_5`, `bipush`, `sipush`, `ldc` (automatic) |
-| `loadConstant(i: Int)` | optimized short-form when possible |
+| `loadConstant(i: Int)` | `iconst_m1`–`iconst_5`, `bipush`, `sipush`, `ldc` (automatic) |
+| `loadConstant(f: Float)` | `fconst_0`–`fconst_2`, `ldc` (automatic) |
+| `loadConstant(l: Long)` | `lconst_0`–`lconst_1`, `ldc2_w` (automatic) |
+| `loadConstant(d: Double)` | `dconst_0`–`dconst_1`, `ldc2_w` (automatic) |
 | `loadConstant(s: String)` | `ldc` (String) |
 | `loadConstant(c: Char)` | `ldc` (Integer with char code) |
 | `dup()` | `dup` |
@@ -167,10 +169,11 @@ Direct offset overloads are also available (`ifequal(offset: Short)`, etc.).
 
 | DSL | JVM |
 |---|---|
-| `iload(name)` | `iload` (with auto-assigned slot) |
-| `istore(name)` | `istore` |
-| `aload(name)` | `aload` |
-| `astore(name)` | `astore` |
+| `iload(name)` / `istore(name)` | `iload` / `istore` (int) |
+| `lload(name)` / `lstore(name)` | `lload` / `lstore` (long, 2 slots) |
+| `fload(name)` / `fstore(name)` | `fload` / `fstore` (float) |
+| `dload(name)` / `dstore(name)` | `dload` / `dstore` (double, 2 slots) |
+| `aload(name)` / `astore(name)` | `aload` / `astore` (object ref) |
 
 ### Method invocation
 
@@ -188,14 +191,22 @@ Direct offset overloads are also available (`ifequal(offset: Short)`, etc.).
 | `getField(className, fieldName, type)` | `getfield` |
 | `putField(className, fieldName, type)` | `putfield` |
 
+### Return instructions
+
+| DSL | JVM |
+|---|---|
+| `` `return`() `` | `return` (void) |
+| `ireturn()` | `ireturn` (int) |
+| `lreturn()` | `lreturn` (long) |
+| `freturn()` | `freturn` (float) |
+| `dreturn()` | `dreturn` (double) |
+| `areturn()` | `areturn` (object ref) |
+
 ### Object operations
 
 | DSL | JVM |
 |---|---|
 | `` `new`(className) `` | `new` |
-| `` `return`() `` | `return` (void) |
-| `ireturn()` | `ireturn` |
-| `areturn()` | `areturn` |
 
 ### References to the constant pool
 

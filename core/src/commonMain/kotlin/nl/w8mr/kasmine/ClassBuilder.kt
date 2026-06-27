@@ -19,6 +19,12 @@ class ClassBuilder {
 
     fun constantInteger(value: Int) = addToPool(ConstantPoolType.ConstantInteger(value))
 
+    fun constantFloat(value: Float) = addToPool(ConstantPoolType.ConstantFloat(value))
+
+    fun constantLong(value: Long) = addToPool(ConstantPoolType.ConstantLong(value))
+
+    fun constantDouble(value: Double) = addToPool(ConstantPoolType.ConstantDouble(value))
+
     private fun nameAndType(
         name: String,
         type: String,
@@ -127,10 +133,17 @@ class ClassBuilder {
             +"cafebabe"
             ushort(0) // minor version
             ushort(classVersion) // major version
-            ushort(constantPool.size + 1) // constantPoolSize + 1
-            val cpMap =
-                constantPool.entries.sortedByDescending { it.value }
-                    .map { it.key }.withIndex().associate { it.value to (it.index + 1) }
+            val sortedEntries = constantPool.entries.sortedByDescending { it.value }.map { it.key }
+            val cpMap = mutableMapOf<ConstantPoolType, Int>()
+            var idx = 1
+            for (entry in sortedEntries) {
+                cpMap[entry] = idx
+                idx++
+                if (entry is ConstantPoolType.ConstantLong || entry is ConstantPoolType.ConstantDouble) {
+                    idx++
+                }
+            }
+            ushort(idx) // constantPoolSize + 1
             cpMap.entries.sortedBy { it.value }.forEach { it.key.write(out, cpMap) }
 
             ushort(classDef.access) // Super Public
@@ -334,6 +347,8 @@ class ClassBuilder {
 
             private fun loadConstant(constant: ConstantPoolType) = add(Instruction.OneArgumentPool(Opcode.LoadConstant, constant))
 
+            private fun loadConstant2W(constant: ConstantPoolType) = add(Instruction.OneArgumentPool(Opcode.LoadConstant2W, constant))
+
             private fun iconstm1() = add(Instruction.NoArgument(Opcode.IConstM1))
 
             private fun iconst0() = add(Instruction.NoArgument(Opcode.IConst0))
@@ -347,6 +362,14 @@ class ClassBuilder {
             private fun iconst4() = add(Instruction.NoArgument(Opcode.IConst4))
 
             private fun iconst5() = add(Instruction.NoArgument(Opcode.IConst5))
+
+            private fun fconst0() = add(Instruction.NoArgument(Opcode.FConst0))
+            private fun fconst1() = add(Instruction.NoArgument(Opcode.FConst1))
+            private fun fconst2() = add(Instruction.NoArgument(Opcode.FConst2))
+            private fun lconst0() = add(Instruction.NoArgument(Opcode.LConst0))
+            private fun lconst1() = add(Instruction.NoArgument(Opcode.LConst1))
+            private fun dconst0() = add(Instruction.NoArgument(Opcode.DConst0))
+            private fun dconst1() = add(Instruction.NoArgument(Opcode.DConst1))
 
             private fun bipush(value: Byte) = add(Instruction.OneArgumentByte(Opcode.BiPush, value))
 
@@ -371,6 +394,25 @@ class ClassBuilder {
                     in -32768..-129 -> sipush(value.toShort())
                     else -> loadConstant(constantInteger(value))
                 }
+
+            fun loadConstant(value: Float) = when {
+                value == 0.0f -> fconst0()
+                value == 1.0f -> fconst1()
+                value == 2.0f -> fconst2()
+                else -> loadConstant(constantFloat(value))
+            }
+
+            fun loadConstant(value: Long) = when {
+                value == 0L -> lconst0()
+                value == 1L -> lconst1()
+                else -> loadConstant2W(constantLong(value))
+            }
+
+            fun loadConstant(value: Double) = when {
+                value == 0.0 -> dconst0()
+                value == 1.0 -> dconst1()
+                else -> loadConstant2W(constantDouble(value))
+            }
 
             private fun invokeVirtual(method: ConstantPoolType.MethodRef) = add(Instruction.OneArgumentPool(Opcode.InvokeVirtual, method))
 
@@ -419,7 +461,9 @@ class ClassBuilder {
             fun `return`() = add(Instruction.NoArgument(Opcode.Return))
 
             fun ireturn() = add(Instruction.NoArgument(Opcode.IReturn))
-
+            fun lreturn() = add(Instruction.NoArgument(Opcode.LReturn))
+            fun freturn() = add(Instruction.NoArgument(Opcode.FReturn))
+            fun dreturn() = add(Instruction.NoArgument(Opcode.DReturn))
             fun areturn() = add(Instruction.NoArgument(Opcode.AReturn))
 
             fun astore(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.AStore, localVar(identifier)))
@@ -427,8 +471,16 @@ class ClassBuilder {
             fun aload(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.ALoad, localVar(identifier)))
 
             fun istore(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.IStore, localVar(identifier)))
-
             fun iload(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.ILoad, localVar(identifier)))
+
+            fun lstore(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.LStore, localVar(identifier)))
+            fun lload(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.LLoad, localVar(identifier)))
+
+            fun fstore(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.FStore, localVar(identifier)))
+            fun fload(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.FLoad, localVar(identifier)))
+
+            fun dstore(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.DStore, localVar(identifier)))
+            fun dload(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.DLoad, localVar(identifier)))
 
             fun dup() = add(Instruction.NoArgument(Opcode.Dup))
 

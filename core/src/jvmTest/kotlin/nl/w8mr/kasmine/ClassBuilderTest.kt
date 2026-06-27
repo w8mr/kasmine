@@ -593,4 +593,130 @@ class ClassBuilderTest {
         val method = clazz.getMethod("run")
         assertEquals(7, method.invoke(null))
     }
+
+    @Test
+    fun `float load store and return`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "FloatOps"
+            method {
+                access = 9u
+                name = "run"
+                signature = "()F"
+                loadConstant(3.14f)
+                fstore("x")
+                fload("x")
+                freturn()
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("FloatOps", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(3.14f, method.invoke(null))
+    }
+
+    @Test
+    fun `long load store and return`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "LongOps"
+            method {
+                access = 9u
+                name = "run"
+                signature = "()J"
+                loadConstant(42L)
+                lstore("x")
+                lload("x")
+                lreturn()
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("LongOps", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(42L, method.invoke(null))
+    }
+
+    @Test
+    fun `double load store and return`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "DoubleOps"
+            method {
+                access = 9u
+                name = "run"
+                signature = "()D"
+                loadConstant(2.718)
+                dstore("x")
+                dload("x")
+                dreturn()
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("DoubleOps", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(2.718, method.invoke(null))
+    }
+
+    @Test
+    fun `long constant 0 and 1`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "LongConst"
+            method {
+                access = 9u
+                name = "run"
+                signature = "()J"
+                loadConstant(0L)
+                lreturn()
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("LongConst", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(0L, method.invoke(null))
+    }
+
+    @Test
+    fun `float constant 0 1 2`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "FloatConst"
+            method {
+                access = 9u
+                name = "run"
+                signature = "()F"
+                loadConstant(2.0f)
+                freturn()
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("FloatConst", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(2.0f, method.invoke(null))
+    }
+
+    @Test
+    fun `double constant 0 and 1`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "DoubleConst"
+            method {
+                access = 9u
+                name = "run"
+                signature = "()D"
+                loadConstant(0.0)
+                dreturn()
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("DoubleConst", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(0.0, method.invoke(null))
+    }
 }
