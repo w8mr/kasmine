@@ -68,7 +68,9 @@ method {
 
 ### Labels / Jump Targets
 
-Use `label()` to create a forward reference, then bind it with `labelName { }`:
+There are two ways to create a label reference:
+
+#### `label()` function
 
 ```kotlin
 val end = label()
@@ -86,7 +88,27 @@ end {
 }
 ```
 
-`label()` returns a `BlockRef`. Pass it directly to branch instructions, or use a lambda for lazy resolution:
+#### `by label` delegate
+
+```kotlin
+val end by label
+
+loadConstant(0)
+istore("x")
+iload("x")
+ifequal(end)
+loadConstant(-1)
+ireturn()
+
+end {
+    loadConstant(42)
+    ireturn()
+}
+```
+
+Both forms are equivalent. `label()` returns a `BlockRef` directly; `by label` uses a Kotlin property delegate.
+
+Pass a `BlockRef` directly to branch instructions, or use a lambda for lazy resolution:
 
 ```kotlin
 // Direct reference

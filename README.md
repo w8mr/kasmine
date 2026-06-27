@@ -59,7 +59,7 @@ repositories {
 }
 
 dependencies {
-    implementation("nl.w8mr.kasmine:core:0.0.5")
+    implementation("nl.w8mr.kasmine:core")
 }
 ```
 

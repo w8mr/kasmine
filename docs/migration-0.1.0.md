@@ -106,8 +106,8 @@ ifequal { end }
 | `createTarget()` | `label()` | **Replaced** |
 | `insertInstructionBlock(target)` | `target { }` | **Replaced** |
 | `instructionBlock { }` | direct method scope | **Removed** |
-| `block { }` | `label()` + `label { }` | **Removed** |
-| `self` | — | **Removed** |
+| `block { }` | `block { }` | **Restored** (v0.0.5 compatible) |
+| `self` | `self` | **Restored** (v0.0.5 compatible) |
 | `goto(target)`, `ifequal(target)` (`InstructionBlock`) | `goto(ref)`, `ifequal(ref)` (`BlockRef` or lambda) | **Replaced** |
 
 ## Compatibility

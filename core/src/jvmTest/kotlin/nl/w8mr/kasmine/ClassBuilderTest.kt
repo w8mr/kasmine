@@ -530,4 +530,67 @@ class ClassBuilderTest {
         val method = clazz.getMethod("run")
         assertEquals(42, method.invoke(null))
     }
+
+    @Test
+    fun `by label delegate forward reference`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "ByLabel"
+            method {
+                access = 9u
+                name = "run"
+                signature = "()I"
+                val end by label
+                loadConstant(0)
+                istore("x")
+                iload("x")
+                ifequal(end)
+                loadConstant(-1)
+                ireturn()
+                end {
+                    loadConstant(99)
+                    ireturn()
+                }
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("ByLabel", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(99, method.invoke(null))
+    }
+
+    @Test
+    fun `by label delegate backward branch`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "ByLabelBack"
+            method {
+                access = 9u
+                name = "run"
+                signature = "()I"
+                val end by label
+                val loop by label
+                loadConstant(0)
+                istore("x")
+                goto(loop)
+                loop {
+                    iload("x")
+                    ifnotequal(end)
+                    loadConstant(1)
+                    istore("x")
+                    goto(loop)
+                }
+                end {
+                    loadConstant(7)
+                    ireturn()
+                }
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("ByLabelBack", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(7, method.invoke(null))
+    }
 }

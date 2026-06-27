@@ -287,6 +287,17 @@ class ClassBuilder {
 
             fun label(): BlockRef = BlockRef()
 
+            inner class LabelDelegate(private val ref: BlockRef) {
+                operator fun getValue(thisRef: DSL?, property: kotlin.reflect.KProperty<*>): BlockRef = ref
+            }
+
+            inner class LabelProvider {
+                operator fun provideDelegate(thisRef: DSL?, property: kotlin.reflect.KProperty<*>): LabelDelegate =
+                    LabelDelegate(BlockRef())
+            }
+
+            val label: LabelProvider get() = LabelProvider()
+
             operator fun BlockRef.invoke(init: DSL.() -> Unit) {
                 val ib = InstructionBlock()
                 this.block = ib
