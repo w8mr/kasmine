@@ -1,10 +1,9 @@
 import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.KotlinMultiplatform
-import com.vanniktech.maven.publish.SonatypeHost
 
 plugins {
-    kotlin("multiplatform") version "2.1.10" apply false
-    id("com.vanniktech.maven.publish") version "0.31.0"
+    kotlin("multiplatform") version "2.4.0" apply false
+    id("com.vanniktech.maven.publish") version "0.37.0"
 }
 
 group = "nl.w8mr.kasmine"
@@ -26,7 +25,7 @@ subprojects {
                 javadocJar = JavadocJar.Empty()
             )
         )
-        publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
+        publishToMavenCentral()
 
         coordinates("nl.w8mr.kasmine", "core", "0.0.5")
 

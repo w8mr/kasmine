@@ -2,7 +2,7 @@
 
 [![Maven Central](https://img.shields.io/maven-central/v/nl.w8mr.kasmine/core)](https://central.sonatype.com/artifact/nl.w8mr.kasmine/core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.1.10-purple)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.4.0-purple)](https://kotlinlang.org)
 [![Java](https://img.shields.io/badge/Java-11%2B-orange)](https://adoptium.net)
 
 Kasmine is a **Kotlin Multiplatform** library for writing JVM bytecode dynamically at runtime. It provides a DSL for defining classes, methods, fields, and bytecode instructions directly in Kotlin, enabling advanced use cases like runtime class generation, dynamic proxies, and bytecode manipulation.
