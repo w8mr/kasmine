@@ -15,3 +15,11 @@ allprojects {
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.multiplatform")
 }
+
+rootProject.plugins.withType<org.jetbrains.kotlin.gradle.targets.js.yarn.YarnPlugin> {
+    rootProject.the<org.jetbrains.kotlin.gradle.targets.js.yarn.YarnRootExtension>().apply {
+        resolution("serialize-javascript", "7.0.6")
+        resolution("webpack", "5.104.1")
+        resolution("diff", "8.0.3")
+    }
+}
