@@ -3,6 +3,7 @@ plugins {
     id("com.vanniktech.maven.publish")
     id("com.ncorti.ktfmt.gradle")
     id("org.jlleitschuh.gradle.ktlint")
+    id("dev.detekt")
 }
 
 group = parent?.group ?: group
@@ -10,6 +11,19 @@ group = parent?.group ?: group
 version = parent?.version ?: version
 
 ktfmt { kotlinLangStyle() }
+
+detekt {
+    source.setFrom(
+        files(
+            "src/jvmMain/kotlin",
+            "src/commonMain/kotlin",
+            "src/jvmTest/kotlin",
+            "src/commonTest/kotlin",
+        )
+    )
+    config.setFrom("$rootDir/config/detekt.yml")
+    buildUponDefaultConfig = true
+}
 
 kotlin {
     jvm { java { toolchain { languageVersion.set(JavaLanguageVersion.of(21)) } } }

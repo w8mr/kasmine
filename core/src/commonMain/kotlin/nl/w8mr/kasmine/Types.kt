@@ -365,6 +365,7 @@ sealed interface Instruction {
 
         override val byteSize: Int = 3
 
+        @Suppress("CyclomaticComplexMethod")
         override fun typeEffect(resolve: TypeResolver): TypeEffect =
             when (opcode) {
                 Opcode.GetStatic -> TypeEffect(emptyList(), listOf(resolve(value)))

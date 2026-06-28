@@ -3,6 +3,7 @@ package nl.w8mr.kasmine
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
+@Suppress("LargeClass")
 class ClassBuilderTest {
 
     @Test

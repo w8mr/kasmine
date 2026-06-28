@@ -4,6 +4,15 @@ data class FlatInstruction(val instruction: Instruction, val offset: Int, val bl
 
 data class StackMapEntry(val offsetDelta: Int, val frame: Frame)
 
+private fun Opcode.isReturnOpcode(): Boolean =
+    this == Opcode.Return ||
+        this == Opcode.IReturn ||
+        this == Opcode.LReturn ||
+        this == Opcode.FReturn ||
+        this == Opcode.DReturn ||
+        this == Opcode.AReturn
+
+@Suppress("TooManyFunctions")
 class StackMapGenerator(
     private val blocks: List<InstructionBlock>,
     private val methodSig: String,
@@ -102,6 +111,7 @@ class StackMapGenerator(
 
     private val targets: Set<Int> by lazy { branchTargets() }
 
+    @Suppress("ReturnCount")
     private fun simulate(
         startFrame: Frame,
         startOffset: Int,
@@ -133,125 +143,14 @@ class StackMapGenerator(
             }
 
             val effect = computeEffect(inst, fi.offset)
-            for (expectedPop in effect.pops) {
-                if (frame.stack.isNotEmpty()) {
-                    frame.stack.removeAt(frame.stack.lastIndex)
-                    if (
-                        expectedPop.slots() == 2 &&
-                            frame.stack.isNotEmpty() &&
-                            frame.stack.last() is VerificationType.Top
-                    ) {
-                        frame.stack.removeAt(frame.stack.lastIndex)
-                    }
-                }
-            }
-            for (push in effect.pushes) {
-                frame.push(push)
-                if (push.slots() == 2) {
-                    frame.push(VerificationType.Top)
-                }
-            }
+            applyTypeEffect(frame, effect)
             maxStack = maxOf(maxStack, frame.stack.size)
 
-            if (inst is Instruction.OneArgumentUByte) {
-                val localIdx = inst.value.toInt()
-                when (inst.opcode) {
-                    Opcode.IStore -> {
-                        frame.setLocal(localIdx, VerificationType.Integer)
-                        maxLocals = maxOf(maxLocals, frame.locals.size)
-                    }
-                    Opcode.LStore -> {
-                        frame.setLocal(localIdx, VerificationType.Long)
-                        if (localIdx + 1 >= frame.locals.size) {
-                            frame.setLocal(localIdx + 1, VerificationType.Top)
-                        }
-                        maxLocals = maxOf(maxLocals, frame.locals.size)
-                    }
-                    Opcode.FStore -> {
-                        frame.setLocal(localIdx, VerificationType.Float)
-                        maxLocals = maxOf(maxLocals, frame.locals.size)
-                    }
-                    Opcode.DStore -> {
-                        frame.setLocal(localIdx, VerificationType.Double)
-                        if (localIdx + 1 >= frame.locals.size) {
-                            frame.setLocal(localIdx + 1, VerificationType.Top)
-                        }
-                        maxLocals = maxOf(maxLocals, frame.locals.size)
-                    }
-                    Opcode.AStore -> {
-                        frame.setLocal(localIdx, VerificationType.Top)
-                        maxLocals = maxOf(maxLocals, frame.locals.size)
-                    }
-                    Opcode.ILoad -> {
-                        if (frame.stack.isNotEmpty()) {
-                            val localType = frame.local(localIdx)
-                            if (localType !is VerificationType.Top) {
-                                frame.stack[frame.stack.lastIndex] = localType
-                            }
-                        }
-                    }
-                    Opcode.LLoad -> {
-                        if (frame.stack.isNotEmpty()) {
-                            val localType = frame.local(localIdx)
-                            if (localType !is VerificationType.Top) {
-                                frame.stack[frame.stack.lastIndex] = localType
-                            }
-                        }
-                    }
-                    Opcode.FLoad -> {
-                        if (frame.stack.isNotEmpty()) {
-                            val localType = frame.local(localIdx)
-                            if (localType !is VerificationType.Top) {
-                                frame.stack[frame.stack.lastIndex] = localType
-                            }
-                        }
-                    }
-                    Opcode.DLoad -> {
-                        if (frame.stack.isNotEmpty()) {
-                            val localType = frame.local(localIdx)
-                            if (localType !is VerificationType.Top) {
-                                frame.stack[frame.stack.lastIndex] = localType
-                            }
-                        }
-                    }
-                    Opcode.ALoad -> {
-                        if (frame.stack.isNotEmpty()) {
-                            val localType = frame.local(localIdx)
-                            if (localType !is VerificationType.Top) {
-                                frame.stack[frame.stack.lastIndex] = localType
-                            }
-                        }
-                    }
-                    else -> {}
-                }
-            }
-
+            handleLocalVariable(frame, inst)
             currentOffset = fi.offset + inst.byteSize
 
-            if (inst is Instruction.OneArgumentShort && inst.opcode == Opcode.Goto) {
-                recordBranchTarget(inst, frame, framesAtTargets, worklist)
-                return
-            }
-
-            if (
-                inst is Instruction.OneArgumentShort &&
-                    (inst.opcode == Opcode.IfNotEqual || inst.opcode == Opcode.IfEqual)
-            ) {
-                recordBranchTarget(inst, frame, framesAtTargets, worklist)
-                continue
-            }
-
-            if (
-                inst is Instruction.NoArgument &&
-                    (inst.opcode == Opcode.Return ||
-                        inst.opcode == Opcode.IReturn ||
-                        inst.opcode == Opcode.LReturn ||
-                        inst.opcode == Opcode.FReturn ||
-                        inst.opcode == Opcode.DReturn ||
-                        inst.opcode == Opcode.AReturn)
-            ) {
-                return
-            }
+            val shouldReturn = handleBranchInstruction(inst, frame, framesAtTargets, worklist)
+            if (shouldReturn) return
 
             if (
                 currentOffset >=
@@ -262,6 +161,100 @@ class StackMapGenerator(
         }
     }
 
+    private fun applyTypeEffect(frame: Frame, effect: TypeEffect) {
+        for (expectedPop in effect.pops) {
+            if (frame.stack.isNotEmpty()) {
+                frame.stack.removeAt(frame.stack.lastIndex)
+                if (
+                    expectedPop.slots() == 2 &&
+                        frame.stack.isNotEmpty() &&
+                        frame.stack.last() is VerificationType.Top
+                ) {
+                    frame.stack.removeAt(frame.stack.lastIndex)
+                }
+            }
+        }
+        for (push in effect.pushes) {
+            frame.push(push)
+            if (push.slots() == 2) {
+                frame.push(VerificationType.Top)
+            }
+        }
+    }
+
+    private fun handleLocalVariable(frame: Frame, inst: Instruction) {
+        if (inst !is Instruction.OneArgumentUByte) return
+        val localIdx = inst.value.toInt()
+        when (inst.opcode) {
+            Opcode.IStore -> {
+                frame.setLocal(localIdx, VerificationType.Integer)
+                maxLocals = maxOf(maxLocals, frame.locals.size)
+            }
+            Opcode.LStore -> {
+                frame.setLocal(localIdx, VerificationType.Long)
+                if (localIdx + 1 >= frame.locals.size) {
+                    frame.setLocal(localIdx + 1, VerificationType.Top)
+                }
+                maxLocals = maxOf(maxLocals, frame.locals.size)
+            }
+            Opcode.FStore -> {
+                frame.setLocal(localIdx, VerificationType.Float)
+                maxLocals = maxOf(maxLocals, frame.locals.size)
+            }
+            Opcode.DStore -> {
+                frame.setLocal(localIdx, VerificationType.Double)
+                if (localIdx + 1 >= frame.locals.size) {
+                    frame.setLocal(localIdx + 1, VerificationType.Top)
+                }
+                maxLocals = maxOf(maxLocals, frame.locals.size)
+            }
+            Opcode.AStore -> {
+                frame.setLocal(localIdx, VerificationType.Top)
+                maxLocals = maxOf(maxLocals, frame.locals.size)
+            }
+            Opcode.ILoad,
+            Opcode.LLoad,
+            Opcode.FLoad,
+            Opcode.DLoad,
+            Opcode.ALoad -> {
+                if (frame.stack.isNotEmpty()) {
+                    val localType = frame.local(localIdx)
+                    if (localType !is VerificationType.Top) {
+                        frame.stack[frame.stack.lastIndex] = localType
+                    }
+                }
+            }
+            else -> {}
+        }
+    }
+
+    @Suppress("ReturnCount")
+    private fun handleBranchInstruction(
+        inst: Instruction,
+        frame: Frame,
+        framesAtTargets: MutableMap<Int, Frame>,
+        worklist: ArrayDeque<Int>,
+    ): Boolean {
+        if (inst is Instruction.OneArgumentShort && inst.opcode == Opcode.Goto) {
+            recordBranchTarget(inst, frame, framesAtTargets, worklist)
+            return true
+        }
+
+        if (
+            inst is Instruction.OneArgumentShort &&
+                (inst.opcode == Opcode.IfNotEqual || inst.opcode == Opcode.IfEqual)
+        ) {
+            recordBranchTarget(inst, frame, framesAtTargets, worklist)
+        }
+
+        if (inst is Instruction.NoArgument && inst.opcode.isReturnOpcode()) {
+            return true
+        }
+
+        return false
+    }
+
+    @Suppress("LoopWithTooManyJumpStatements")
     private fun recordBranchTarget(
         inst: Instruction.OneArgumentShort,
         frame: Frame,
@@ -286,75 +279,34 @@ class StackMapGenerator(
         }
     }
 
+    @Suppress("CyclomaticComplexMethod")
     private fun computeEffect(inst: Instruction, offset: Int): TypeEffect =
         when {
             inst is Instruction.OneArgumentPool && inst.opcode == Opcode.New ->
                 TypeEffect(emptyList(), listOf(VerificationType.Uninitialized(offset.toUShort())))
 
             inst is Instruction.OneArgumentPool &&
-                (inst.opcode == Opcode.InvokeVirtual || inst.opcode == Opcode.InvokeSpecial) -> {
-                val methodRef = inst.value as? ConstantPoolType.MethodRef
-                val returnType =
-                    methodRef?.let {
-                        VerificationType.returnTypeFromMethodDescriptor(
-                            it.nameAndTypeRef.typeRef.value
-                        )
-                    } ?: VerificationType.Top
-                val paramTypes =
-                    methodRef?.let {
-                        VerificationType.parameterTypesFromMethodDescriptor(
-                            it.nameAndTypeRef.typeRef.value
-                        )
-                    } ?: emptyList()
-                val allPops = mutableListOf<VerificationType>()
-                allPops.addAll(paramTypes.reversed())
-                allPops.add(VerificationType.Top)
-                val pushes =
-                    if (returnType is VerificationType.Top) emptyList() else listOf(returnType)
-                TypeEffect(allPops, pushes)
-            }
-
-            inst is Instruction.OneArgumentPool && inst.opcode == Opcode.InvokeStatic -> {
-                val methodRef = inst.value as? ConstantPoolType.MethodRef
-                val returnType =
-                    methodRef?.let {
-                        VerificationType.returnTypeFromMethodDescriptor(
-                            it.nameAndTypeRef.typeRef.value
-                        )
-                    } ?: VerificationType.Top
-                val paramTypes =
-                    methodRef?.let {
-                        VerificationType.parameterTypesFromMethodDescriptor(
-                            it.nameAndTypeRef.typeRef.value
-                        )
-                    } ?: emptyList()
-                TypeEffect(
-                    paramTypes.reversed(),
-                    if (returnType is VerificationType.Top) emptyList() else listOf(returnType),
+                (inst.opcode == Opcode.InvokeVirtual || inst.opcode == Opcode.InvokeSpecial) ->
+                computeMethodInvokeEffect(
+                    inst.value as? ConstantPoolType.MethodRef,
+                    includeReceiver = true,
                 )
-            }
+
+            inst is Instruction.OneArgumentPool && inst.opcode == Opcode.InvokeStatic ->
+                computeMethodInvokeEffect(
+                    inst.value as? ConstantPoolType.MethodRef,
+                    includeReceiver = false,
+                )
 
             inst is Instruction.OneArgumentPool &&
-                (inst.opcode == Opcode.GetStatic || inst.opcode == Opcode.GetField) -> {
-                val fieldRef = inst.value as? ConstantPoolType.FieldRef
-                val fieldType =
-                    fieldRef?.let {
-                        VerificationType.fromFieldDescriptor(it.nameAndTypeRef.typeRef.value)
-                    } ?: VerificationType.Top
-                val pops =
-                    if (inst.opcode == Opcode.GetField) listOf(VerificationType.Top)
-                    else emptyList()
-                TypeEffect(pops, listOf(fieldType))
-            }
+                (inst.opcode == Opcode.GetStatic || inst.opcode == Opcode.GetField) ->
+                computeFieldGetEffect(
+                    inst.value as? ConstantPoolType.FieldRef,
+                    isStatic = inst.opcode == Opcode.GetStatic,
+                )
 
-            inst is Instruction.OneArgumentPool && inst.opcode == Opcode.PutField -> {
-                val fieldRef = inst.value as? ConstantPoolType.FieldRef
-                val fieldType =
-                    fieldRef?.let {
-                        VerificationType.fromFieldDescriptor(it.nameAndTypeRef.typeRef.value)
-                    } ?: VerificationType.Top
-                TypeEffect(listOf(fieldType, VerificationType.Top), emptyList())
-            }
+            inst is Instruction.OneArgumentPool && inst.opcode == Opcode.PutField ->
+                computeFieldPutEffect(inst.value as? ConstantPoolType.FieldRef)
 
             inst is Instruction.OneArgumentPool && inst.opcode == Opcode.LoadConstant -> {
                 val t =
@@ -369,6 +321,43 @@ class StackMapGenerator(
 
             else -> inst.typeEffect { VerificationType.Top }
         }
+
+    private fun computeMethodInvokeEffect(
+        methodRef: ConstantPoolType.MethodRef?,
+        includeReceiver: Boolean,
+    ): TypeEffect {
+        val returnType =
+            methodRef?.let {
+                VerificationType.returnTypeFromMethodDescriptor(it.nameAndTypeRef.typeRef.value)
+            } ?: VerificationType.Top
+        val paramTypes =
+            methodRef?.let {
+                VerificationType.parameterTypesFromMethodDescriptor(it.nameAndTypeRef.typeRef.value)
+            } ?: emptyList()
+        val allPops = mutableListOf<VerificationType>()
+        allPops.addAll(paramTypes.reversed())
+        if (includeReceiver) allPops.add(VerificationType.Top)
+        val pushes = if (returnType is VerificationType.Top) emptyList() else listOf(returnType)
+        return TypeEffect(allPops, pushes)
+    }
+
+    private fun computeFieldGetEffect(
+        fieldRef: ConstantPoolType.FieldRef?,
+        isStatic: Boolean,
+    ): TypeEffect {
+        val fieldType =
+            fieldRef?.let { VerificationType.fromFieldDescriptor(it.nameAndTypeRef.typeRef.value) }
+                ?: VerificationType.Top
+        val pops = if (isStatic) emptyList() else listOf(VerificationType.Top)
+        return TypeEffect(pops, listOf(fieldType))
+    }
+
+    private fun computeFieldPutEffect(fieldRef: ConstantPoolType.FieldRef?): TypeEffect {
+        val fieldType =
+            fieldRef?.let { VerificationType.fromFieldDescriptor(it.nameAndTypeRef.typeRef.value) }
+                ?: VerificationType.Top
+        return TypeEffect(listOf(fieldType, VerificationType.Top), emptyList())
+    }
 
     fun writeStackMap(
         out: ByteCodeWriter,

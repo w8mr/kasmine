@@ -6,6 +6,7 @@ fun classBuilder(init: ClassBuilder.ClassDSL.DSL.() -> Unit): ClassBuilder {
     return builder
 }
 
+@Suppress("TooManyFunctions")
 class ClassBuilder {
     private val constantPool = mutableMapOf<ConstantPoolType, Int>()
     lateinit var classDef: ClassDef
@@ -122,21 +123,7 @@ class ClassBuilder {
             +"cafebabe"
             ushort(0) // minor version
             ushort(classVersion) // major version
-            val sortedEntries = constantPool.entries.sortedByDescending { it.value }.map { it.key }
-            val cpMap = mutableMapOf<ConstantPoolType, Int>()
-            var idx = 1
-            for (entry in sortedEntries) {
-                cpMap[entry] = idx
-                idx++
-                if (
-                    entry is ConstantPoolType.ConstantLong ||
-                        entry is ConstantPoolType.ConstantDouble
-                ) {
-                    idx++
-                }
-            }
-            ushort(idx) // constantPoolSize + 1
-            cpMap.entries.sortedBy { it.value }.forEach { it.key.write(out, cpMap) }
+            val cpMap = writeConstantPool()
 
             ushort(classDef.access) // Super Public
             ushort(cpMap[classDef.classRef]!!) // main class
@@ -150,53 +137,75 @@ class ClassBuilder {
                 ushort(0) // attribute count
             }
             ushort(classDef.methods.size) // method count
-            classDef.methods.forEach { method ->
-                ushort(method.access)
-                ushort(cpMap[method.methodName]!!) // main class super
-                ushort(cpMap[method.methodSig]!!) // method signature
-                ushort(1u) // attribute count method
-                ushort(cpMap[ConstantPoolType.UTF8String("Code")]!!) // reference to Code attribute
-                val instWriter = ByteCodeWriter()
-                method.instructions.forEach { block ->
-                    block.instructions.forEach { it.write(instWriter, cpMap) }
-                }
-                val instBytes = instWriter.toByteArray()
-
-                val generator =
-                    StackMapGenerator(
-                        blocks = method.instructions,
-                        methodSig = method.methodSig.value,
-                        isStatic = (method.access.toInt() and 0x0008) != 0,
-                        thisClassName = classDef.classRef.nameRef.value,
-                    )
-                val smtEntries = generator.generate()
-                val smtWriter = ByteCodeWriter()
-                if (needsStackMap) {
-                    generator.writeStackMap(smtWriter, cpMap, smtEntries)
-                }
-                val smtBytes = smtWriter.toByteArray()
-                val hasCodeAttr = smtBytes.isNotEmpty()
-                val codeAttrLen = (12 + instBytes.size + smtBytes.size).toUInt()
-
-                uint(codeAttrLen) // code attribute bytes count
-                ushort(generator.maxStack)
-                ushort(generator.maxLocals)
-                uint(instBytes.size.toUInt()) // code block bytes count
-                out.write(instBytes)
-                ushort(0) // exception count
-                if (hasCodeAttr) {
-                    ushort(1) // attribute count method
-                    out.write(smtBytes)
-                } else {
-                    ushort(0) // attribute count method
-                }
-            }
+            classDef.methods.forEach { method -> writeMethod(method, cpMap, needsStackMap) }
             ushort(0) // attribute count class
         }
 
-        val toByteArray = out.toByteArray()
+        return out.toByteArray()
+    }
 
-        return toByteArray
+    private fun ByteCodeWriter.writeConstantPool(): MutableMap<ConstantPoolType, Int> {
+        val sortedEntries = constantPool.entries.sortedByDescending { it.value }.map { it.key }
+        val cpMap = mutableMapOf<ConstantPoolType, Int>()
+        var idx = 1
+        for (entry in sortedEntries) {
+            cpMap[entry] = idx
+            idx++
+            if (
+                entry is ConstantPoolType.ConstantLong || entry is ConstantPoolType.ConstantDouble
+            ) {
+                idx++
+            }
+        }
+        ushort(idx) // constantPoolSize + 1
+        cpMap.entries.sortedBy { it.value }.forEach { it.key.write(this, cpMap) }
+        return cpMap
+    }
+
+    private fun ByteCodeWriter.writeMethod(
+        method: MethodDef,
+        cpMap: MutableMap<ConstantPoolType, Int>,
+        needsStackMap: Boolean,
+    ) {
+        ushort(method.access)
+        ushort(cpMap[method.methodName]!!) // main class super
+        ushort(cpMap[method.methodSig]!!) // method signature
+        ushort(1u) // attribute count method
+        ushort(cpMap[ConstantPoolType.UTF8String("Code")]!!) // reference to Code attribute
+        val instWriter = ByteCodeWriter()
+        method.instructions.forEach { block ->
+            block.instructions.forEach { it.write(instWriter, cpMap) }
+        }
+        val instBytes = instWriter.toByteArray()
+
+        val generator =
+            StackMapGenerator(
+                blocks = method.instructions,
+                methodSig = method.methodSig.value,
+                isStatic = (method.access.toInt() and 0x0008) != 0,
+                thisClassName = classDef.classRef.nameRef.value,
+            )
+        val smtEntries = generator.generate()
+        val smtWriter = ByteCodeWriter()
+        if (needsStackMap) {
+            generator.writeStackMap(smtWriter, cpMap, smtEntries)
+        }
+        val smtBytes = smtWriter.toByteArray()
+        val hasCodeAttr = smtBytes.isNotEmpty()
+        val codeAttrLen = (12 + instBytes.size + smtBytes.size).toUInt()
+
+        uint(codeAttrLen) // code attribute bytes count
+        ushort(generator.maxStack)
+        ushort(generator.maxLocals)
+        uint(instBytes.size.toUInt()) // code block bytes count
+        write(instBytes)
+        ushort(0) // exception count
+        if (hasCodeAttr) {
+            ushort(1) // attribute count method
+            write(smtBytes)
+        } else {
+            ushort(0) // attribute count method
+        }
     }
 
     inner class ClassDSL {
@@ -281,6 +290,7 @@ class ClassBuilder {
         val instructionBlocks = mutableListOf<InstructionBlock>()
         var currentBlock: InstructionBlock? = null
 
+        @Suppress("TooManyFunctions")
         inner class DSL {
             val parent: ClassDSL.DSL
                 get() = parentDSL

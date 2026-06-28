@@ -49,17 +49,17 @@ sealed class VerificationType {
         }
     }
 
-    fun merge(other: VerificationType): VerificationType {
-        if (this == other) return this
-        if (this is Top) return other
-        if (other is Top) return this
-        if (this is Object && other is Object) {
-            return if (this.className == other.className) this else Object("java/lang/Object")
+    fun merge(other: VerificationType): VerificationType =
+        when {
+            this == other -> this
+            this is Top -> other
+            other is Top -> this
+            this is Object && other is Object ->
+                if (this.className == other.className) this else Object("java/lang/Object")
+            this is Object && other is Null -> this
+            this is Null && other is Object -> other
+            else -> Top
         }
-        if (this is Object && other is Null) return this
-        if (this is Null && other is Object) return other
-        return Top
-    }
 
     fun slots(): Int =
         when (this) {
