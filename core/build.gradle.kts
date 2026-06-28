@@ -2,6 +2,7 @@ plugins {
     kotlin("multiplatform")
     id("com.vanniktech.maven.publish")
     id("com.ncorti.ktfmt.gradle")
+    id("org.jlleitschuh.gradle.ktlint")
 }
 
 group = parent?.group ?: group

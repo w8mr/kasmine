@@ -469,9 +469,11 @@ class ClassBuilder {
             fun invokeStatic(className: String, methodName: String, type: String) =
                 invokeStatic(methodRef(className, methodName, type))
 
+            @Suppress("ktlint:standard:function-naming")
             private fun `new`(clazz: ConstantPoolType.ClassEntry) =
                 add(Instruction.OneArgumentPool(Opcode.New, clazz))
 
+            @Suppress("ktlint:standard:function-naming")
             fun `new`(className: String) = `new`(classEntry(className))
 
             fun `return`() = add(Instruction.NoArgument(Opcode.Return))

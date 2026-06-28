@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# Pre-commit hook: run ktlint and ktfmt checks before allowing a commit
+
+echo "Running ktlint and ktfmt checks..."
+
+# Run both checks
+./gradlew ktlintCheck ktfmtCheck --daemon
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "❌ ktlint or ktfmt check failed. Please fix the issues above before committing."
+    echo "   You can run './gradlew ktfmtFormat' to auto-fix formatting issues."
+    exit 1
+fi
+
+echo "✅ All checks passed."

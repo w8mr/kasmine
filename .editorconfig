@@ -1,0 +1,72 @@
+root = true
+
+[*]
+charset = utf-8
+
+[*.{kt,kts}]
+# Disable all formatting/styling rules that conflict with ktfmt
+
+# Spacing
+ktlint_standard_annotation-spacing = disabled
+ktlint_standard_curly-spacing = disabled
+ktlint_standard_comment-spacing = disabled
+ktlint_standard_dot-spacing = disabled
+ktlint_standard_keyword-spacing = disabled
+ktlint_standard_modifier-list-spacing = disabled
+ktlint_standard_operator-spacing = disabled
+ktlint_standard_parameter-list-spacing = disabled
+ktlint_standard_parenthesis-spacing = disabled
+ktlint_standard_range-spacing = disabled
+ktlint_standard_string-template = disabled
+ktlint_standard_try-catch-finally-spacing = disabled
+ktlint_standard_type-argument-list-spacing = disabled
+ktlint_standard_type-parameter-list-spacing = disabled
+ktlint_standard_colon-spacing = disabled
+ktlint_standard_comma-spacing = disabled
+ktlint_standard_function-return-type-spacing = disabled
+ktlint_standard_function-start-of-body-spacing = disabled
+ktlint_standard_function-type-reference-spacing = disabled
+
+# Wrapping & indentation
+ktlint_standard_argument-list-wrapping = disabled
+ktlint_standard_chain-method-continuation = disabled
+ktlint_standard_comment-wrapping = disabled
+ktlint_standard_enum-wrapping = disabled
+ktlint_standard_if-else-wrapping = disabled
+ktlint_standard_parameter-list-wrapping = disabled
+ktlint_standard_parameter-wrapping = disabled
+ktlint_standard_property-wrapping = disabled
+ktlint_standard_wrapping = disabled
+ktlint_standard_indent = disabled
+
+# Blank lines
+ktlint_standard_blank-line-between-when-conditions = disabled
+ktlint_standard_no-blank-line-before-declaration = disabled
+ktlint_standard_no-consecutive-blank-lines = disabled
+ktlint_standard_no-empty-first-line-in-class-body = disabled
+
+# Layout/formatting
+ktlint_standard_annotation = disabled
+ktlint_standard_class-signature = disabled
+ktlint_standard_final-newline = disabled
+ktlint_standard_function-expression-body = disabled
+ktlint_standard_function-literal = disabled
+ktlint_standard_function-signature = disabled
+ktlint_standard_if-else-bracing = disabled
+ktlint_standard_import-ordering = disabled
+ktlint_standard_max-line-length = disabled
+ktlint_standard_modifier-order = disabled
+ktlint_standard_multiline-expression-wrapping = disabled
+ktlint_standard_multiline-if-else = disabled
+ktlint_standard_multiline-loop = disabled
+ktlint_standard_no-empty-class-bodies = disabled
+ktlint_standard_no-line-break-after-else = disabled
+ktlint_standard_no-multi-spaces = disabled
+ktlint_standard_no-semicolons = disabled
+ktlint_standard_no-trailing-whitespaces = disabled
+ktlint_standard_string-template-indent = disabled
+ktlint_standard_trailing-comma-on-call-site = disabled
+ktlint_standard_trailing-comma-on-declaration-site = disabled
+ktlint_standard_filename = disabled
+ktlint_standard_when-entry-bracing = disabled
+ktlint_standard_no-wildcard-imports = disabled
