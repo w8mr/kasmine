@@ -1,46 +1,27 @@
 plugins {
     kotlin("multiplatform")
     id("com.vanniktech.maven.publish")
+    id("com.ncorti.ktfmt.gradle")
 }
 
 group = parent?.group ?: group
+
 version = parent?.version ?: version
 
+ktfmt { kotlinLangStyle() }
 
 kotlin {
-    jvm {
-        java {
-            toolchain {
-                languageVersion.set(JavaLanguageVersion.of(21))
-            }
-        }
-    }
+    jvm { java { toolchain { languageVersion.set(JavaLanguageVersion.of(21)) } } }
     js {
         browser()
         nodejs()
     }
 
     sourceSets {
-        val commonMain by getting {
-            dependencies {
-                implementation(kotlin("stdlib-common"))
-            }
-        }
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test"))
-            }
-        }
-        val jvmMain by getting {
-            dependencies {
-                implementation(kotlin("stdlib"))
-            }
-        }
-        val jvmTest by getting {
-            dependencies {
-                implementation(kotlin("test"))
-            }
-        }
+        val commonMain by getting { dependencies { implementation(kotlin("stdlib-common")) } }
+        val commonTest by getting { dependencies { implementation(kotlin("test")) } }
+        val jvmMain by getting { dependencies { implementation(kotlin("stdlib")) } }
+        val jvmTest by getting { dependencies { implementation(kotlin("test")) } }
     }
 
     compilerOptions {
@@ -50,14 +31,10 @@ kotlin {
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile> {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
-    }
+    compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21) }
 }
 
-tasks.withType<Test> {
-    useJUnitPlatform()
-}
+tasks.withType<Test> { useJUnitPlatform() }
 
 mavenPublishing {
     configure(
@@ -97,7 +74,6 @@ mavenPublishing {
             connection.set("scm:git:git://github.com/w8mr/kasmine.git")
             developerConnection.set("scm:git:ssh://git@github.com/w8mr/kasmine.git")
         }
-
     }
     signAllPublications()
 }

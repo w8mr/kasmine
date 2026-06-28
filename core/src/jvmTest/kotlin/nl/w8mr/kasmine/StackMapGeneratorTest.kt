@@ -1,7 +1,7 @@
 package nl.w8mr.kasmine
 
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Test
 
 class StackMapGeneratorTest {
 
@@ -23,12 +23,14 @@ class StackMapGeneratorTest {
         className: String = "TestClass",
     ) = StackMapGenerator(blocks, sig, isStatic, className)
 
-    @Test fun `hasBranches false when no targets`() {
+    @Test
+    fun `hasBranches false when no targets`() {
         val g = generator(listOf(block(Instruction.NoArgument(Opcode.Return))))
         assertFalse(g.hasBranches())
     }
 
-    @Test fun `hasBranches true when target set`() {
+    @Test
+    fun `hasBranches true when target set`() {
         val target = InstructionBlock()
         val b = block(Instruction.NoArgument(Opcode.IConst0))
         b.jumpsTo(target)
@@ -36,14 +38,22 @@ class StackMapGeneratorTest {
         assertTrue(g.hasBranches())
     }
 
-    @Test fun `generate empty when no branches`() {
-        val g = generator(listOf(
-            block(Instruction.NoArgument(Opcode.IConst0), Instruction.NoArgument(Opcode.Return))
-        ))
+    @Test
+    fun `generate empty when no branches`() {
+        val g =
+            generator(
+                listOf(
+                    block(
+                        Instruction.NoArgument(Opcode.IConst0),
+                        Instruction.NoArgument(Opcode.Return),
+                    )
+                )
+            )
         assertTrue(g.generate().isEmpty())
     }
 
-    @Test fun `generate has entry when target block exists`() {
+    @Test
+    fun `generate has entry when target block exists`() {
         val target = InstructionBlock()
         target.add(Instruction.NoArgument(Opcode.Return))
         val main = block(Instruction.NoArgument(Opcode.IConst0))
@@ -52,7 +62,8 @@ class StackMapGeneratorTest {
         assertEquals(1, g.generate().size)
     }
 
-    @Test fun `forward ifequal generates frame at target`() {
+    @Test
+    fun `forward ifequal generates frame at target`() {
         val end = InstructionBlock()
         end.add(Instruction.NoArgument(Opcode.IReturn))
 
@@ -69,7 +80,8 @@ class StackMapGeneratorTest {
         assertEquals(VerificationType.Top, entries[0].frame.local(0))
     }
 
-    @Test fun `target block gets correct locals from dataflow`() {
+    @Test
+    fun `target block gets correct locals from dataflow`() {
         val end = InstructionBlock()
         end.add(Instruction.NoArgument(Opcode.IReturn))
 
@@ -89,7 +101,8 @@ class StackMapGeneratorTest {
         assertTrue(frame.stack.isEmpty())
     }
 
-    @Test fun `istore updates local to Integer`() {
+    @Test
+    fun `istore updates local to Integer`() {
         val end = InstructionBlock()
         end.add(Instruction.NoArgument(Opcode.Return))
 
@@ -107,7 +120,8 @@ class StackMapGeneratorTest {
         assertEquals(VerificationType.Integer, frame.local(0))
     }
 
-    @Test fun `aload on Top local stays Top`() {
+    @Test
+    fun `aload on Top local stays Top`() {
         val end = InstructionBlock()
         end.add(Instruction.NoArgument(Opcode.Return))
 
@@ -124,7 +138,8 @@ class StackMapGeneratorTest {
         assertEquals(VerificationType.Top, frame.local(0))
     }
 
-    @Test fun `backward branch loop generates frame at header`() {
+    @Test
+    fun `backward branch loop generates frame at header`() {
         val loopBody = InstructionBlock()
         val loopHeader = InstructionBlock()
         loopHeader.add(Instruction.NoArgument(Opcode.IConst0))
@@ -138,7 +153,8 @@ class StackMapGeneratorTest {
         assertFalse(entries.isEmpty())
     }
 
-    @Test fun `multiple branches produce two frames`() {
+    @Test
+    fun `multiple branches produce two frames`() {
         val target1 = InstructionBlock()
         target1.add(Instruction.NoArgument(Opcode.IReturn))
         val target2 = InstructionBlock()
@@ -161,7 +177,8 @@ class StackMapGeneratorTest {
         assertEquals(2, entries.size)
     }
 
-    @Test fun `goto falls through and also reaches target`() {
+    @Test
+    fun `goto falls through and also reaches target`() {
         val target = InstructionBlock()
         target.add(Instruction.NoArgument(Opcode.IReturn))
 
@@ -180,7 +197,8 @@ class StackMapGeneratorTest {
         assertEquals(1, entries.size)
     }
 
-    @Test fun `instance method initial frame has this`() {
+    @Test
+    fun `instance method initial frame has this`() {
         val end = InstructionBlock()
         end.add(Instruction.NoArgument(Opcode.IReturn))
         val main = InstructionBlock()
@@ -195,7 +213,8 @@ class StackMapGeneratorTest {
         assertEquals(VerificationType.Object("MyClass"), entries[0].frame.local(0))
     }
 
-    @Test fun `offset delta is correct for forward branch`() {
+    @Test
+    fun `offset delta is correct for forward branch`() {
         val end = InstructionBlock()
         end.add(Instruction.NoArgument(Opcode.IReturn))
 
@@ -209,10 +228,14 @@ class StackMapGeneratorTest {
         val entries = g.generate()
         assertEquals(1, entries.size)
         val entry = entries[0]
-        assertTrue(entry.offsetDelta >= 0, "offsetDelta should be >= 0 but was ${entry.offsetDelta}")
+        assertTrue(
+            entry.offsetDelta >= 0,
+            "offsetDelta should be >= 0 but was ${entry.offsetDelta}",
+        )
     }
 
-    @Test fun `writeStackMap produces valid header bytes`() {
+    @Test
+    fun `writeStackMap produces valid header bytes`() {
         val end = InstructionBlock()
         end.add(Instruction.NoArgument(Opcode.IReturn))
 
@@ -226,17 +249,16 @@ class StackMapGeneratorTest {
         val entries = g.generate()
 
         val pool = ConstantPoolType.UTF8String("StackMapTable")
-        val cp: Map<ConstantPoolType, Int> = mapOf(
-            pool to 1,
-            ConstantPoolType.UTF8String("java/lang/Object") to 2,
-        )
+        val cp: Map<ConstantPoolType, Int> =
+            mapOf(pool to 1, ConstantPoolType.UTF8String("java/lang/Object") to 2)
 
         val out = ByteCodeWriter()
         g.writeStackMap(out, cp, entries)
         val bytes = out.toByteArray()
 
         val bodyOffset = 6
-        val entryCount = (bytes[bodyOffset].toInt() and 0xff) shl 8 or (bytes[bodyOffset + 1].toInt() and 0xff)
+        val entryCount =
+            (bytes[bodyOffset].toInt() and 0xff) shl 8 or (bytes[bodyOffset + 1].toInt() and 0xff)
         assertEquals(entries.size, entryCount)
 
         val frameOffset = bodyOffset + 2
@@ -244,7 +266,8 @@ class StackMapGeneratorTest {
         assertEquals(255, tag)
     }
 
-    @Test fun `stack is empty at ifequal target when comparing to zero`() {
+    @Test
+    fun `stack is empty at ifequal target when comparing to zero`() {
         val end = InstructionBlock()
         end.add(Instruction.NoArgument(Opcode.IReturn))
 
@@ -260,7 +283,8 @@ class StackMapGeneratorTest {
         assertTrue(entries[0].frame.stack.isEmpty(), "stack should be empty after ifequal")
     }
 
-    @Test fun `nested if-else generates correct frames`() {
+    @Test
+    fun `nested if-else generates correct frames`() {
         val innerElse = InstructionBlock()
         innerElse.add(Instruction.NoArgument(Opcode.IConst2))
         innerElse.add(Instruction.NoArgument(Opcode.IReturn))
@@ -283,7 +307,8 @@ class StackMapGeneratorTest {
         main.add(outerIneq)
         main.jumpsTo(outerElse)
 
-        val g = generator(listOf(main, outerElse, innerElse, afterInner, end), "()I", isStatic = true)
+        val g =
+            generator(listOf(main, outerElse, innerElse, afterInner, end), "()I", isStatic = true)
         val entries = g.generate()
         assertTrue(entries.size >= 2)
     }

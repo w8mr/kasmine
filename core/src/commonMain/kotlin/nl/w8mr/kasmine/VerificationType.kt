@@ -2,30 +2,39 @@ package nl.w8mr.kasmine
 
 sealed class VerificationType {
     object Top : VerificationType()
+
     object Integer : VerificationType()
+
     object Float : VerificationType()
+
     object Double : VerificationType()
+
     object Long : VerificationType()
+
     object Null : VerificationType()
+
     object UninitializedThis : VerificationType()
+
     data class Object(val className: String) : VerificationType() {
         override fun toString(): String = "Object($className)"
     }
+
     data class Uninitialized(val offset: UShort) : VerificationType() {
         override fun toString(): String = "Uninitialized($offset)"
     }
 
-    fun tag(): Int = when (this) {
-        Top -> 0
-        Integer -> 1
-        Float -> 2
-        Double -> 3
-        Long -> 4
-        Null -> 5
-        UninitializedThis -> 6
-        is Object -> 7
-        is Uninitialized -> 8
-    }
+    fun tag(): Int =
+        when (this) {
+            Top -> 0
+            Integer -> 1
+            Float -> 2
+            Double -> 3
+            Long -> 4
+            Null -> 5
+            UninitializedThis -> 6
+            is Object -> 7
+            is Uninitialized -> 8
+        }
 
     fun write(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>) {
         out.ubyte(tag().toUByte())
@@ -45,32 +54,38 @@ sealed class VerificationType {
         if (this is Top) return other
         if (other is Top) return this
         if (this is Object && other is Object) {
-            return if (this.className == other.className) this
-            else Object("java/lang/Object")
+            return if (this.className == other.className) this else Object("java/lang/Object")
         }
         if (this is Object && other is Null) return this
         if (this is Null && other is Object) return other
         return Top
     }
 
-    fun slots(): Int = when (this) {
-        is Long, is Double -> 2
-        else -> 1
-    }
+    fun slots(): Int =
+        when (this) {
+            is Long,
+            is Double -> 2
+            else -> 1
+        }
 
     companion object {
-        fun fromFieldDescriptor(desc: String): VerificationType = when (desc.firstOrNull()) {
-            'B', 'C', 'I', 'S', 'Z' -> Integer
-            'F' -> Float
-            'D' -> Double
-            'J' -> Long
-            'L' -> {
-                val internal = desc.drop(1).dropLast(1)
-                Object(internal)
+        fun fromFieldDescriptor(desc: String): VerificationType =
+            when (desc.firstOrNull()) {
+                'B',
+                'C',
+                'I',
+                'S',
+                'Z' -> Integer
+                'F' -> Float
+                'D' -> Double
+                'J' -> Long
+                'L' -> {
+                    val internal = desc.drop(1).dropLast(1)
+                    Object(internal)
+                }
+                '[' -> Object(desc)
+                else -> Top
             }
-            '[' -> Object(desc)
-            else -> Top
-        }
 
         fun returnTypeFromMethodDescriptor(desc: String): VerificationType {
             val paren = desc.indexOf(')')
@@ -86,12 +101,26 @@ sealed class VerificationType {
             var i = 0
             while (i < params.length) {
                 when (params[i]) {
-                    'B', 'C', 'I', 'S', 'Z' -> {
-                        result.add(Integer); i++
+                    'B',
+                    'C',
+                    'I',
+                    'S',
+                    'Z' -> {
+                        result.add(Integer)
+                        i++
                     }
-                    'F' -> { result.add(Float); i++ }
-                    'D' -> { result.add(Double); i++ }
-                    'J' -> { result.add(Long); i++ }
+                    'F' -> {
+                        result.add(Float)
+                        i++
+                    }
+                    'D' -> {
+                        result.add(Double)
+                        i++
+                    }
+                    'J' -> {
+                        result.add(Long)
+                        i++
+                    }
                     'L' -> {
                         val end = params.indexOf(';', i)
                         result.add(Object(params.substring(i + 1, end)))
@@ -100,29 +129,32 @@ sealed class VerificationType {
                     '[' -> {
                         var j = i
                         while (params[j] == '[') j++
-                        if (params[j] == 'L') j = params.indexOf(';', j) + 1
-                        else j++
+                        if (params[j] == 'L') j = params.indexOf(';', j) + 1 else j++
                         result.add(Object(params.substring(i, j)))
                         i = j
                     }
-                    else -> { result.add(Top); i++ }
+                    else -> {
+                        result.add(Top)
+                        i++
+                    }
                 }
             }
             return result
         }
     }
 
-    override fun toString(): String = when (this) {
-        Top -> "Top"
-        Integer -> "Integer"
-        Float -> "Float"
-        Double -> "Double"
-        Long -> "Long"
-        Null -> "Null"
-        UninitializedThis -> "UninitializedThis"
-        is Object -> "Object($className)"
-        is Uninitialized -> "Uninitialized($offset)"
-    }
+    override fun toString(): String =
+        when (this) {
+            Top -> "Top"
+            Integer -> "Integer"
+            Float -> "Float"
+            Double -> "Double"
+            Long -> "Long"
+            Null -> "Null"
+            UninitializedThis -> "UninitializedThis"
+            is Object -> "Object($className)"
+            is Uninitialized -> "Uninitialized($offset)"
+        }
 }
 
 class Frame(

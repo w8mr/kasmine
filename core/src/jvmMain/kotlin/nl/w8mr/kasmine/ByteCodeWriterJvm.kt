@@ -48,19 +48,12 @@ actual class ByteCodeWriter {
         out.write((value shr 0).toInt())
     }
 
-    actual fun instructionOneArgument(
-        opcode: String,
-        value: Int,
-    ) {
+    actual fun instructionOneArgument(opcode: String, value: Int) {
         +opcode
         ushort(value)
     }
 
-    actual fun instructionTwoArgument(
-        opcode: String,
-        value1: Int,
-        value2: Int,
-    ) {
+    actual fun instructionTwoArgument(opcode: String, value1: Int, value2: Int) {
         +opcode
         ushort(value1)
         ushort(value2)

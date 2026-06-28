@@ -1,6 +1,7 @@
 plugins {
     kotlin("multiplatform") version "2.4.0" apply false
     id("com.vanniktech.maven.publish") version "0.37.0" apply false
+    id("com.ncorti.ktfmt.gradle") version "0.26.0" apply false
 }
 
 group = "nl.w8mr.kasmine"

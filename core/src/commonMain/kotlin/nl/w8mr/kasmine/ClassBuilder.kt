@@ -13,9 +13,11 @@ class ClassBuilder {
 
     private fun utf8String(value: String) = addToPool(ConstantPoolType.UTF8String(value))
 
-    private fun classEntry(value: String) = addToPool(ConstantPoolType.ClassEntry(utf8String(value)))
+    private fun classEntry(value: String) =
+        addToPool(ConstantPoolType.ClassEntry(utf8String(value)))
 
-    fun constantString(value: String) = addToPool(ConstantPoolType.ConstantString(utf8String(value)))
+    fun constantString(value: String) =
+        addToPool(ConstantPoolType.ConstantString(utf8String(value)))
 
     fun constantInteger(value: Int) = addToPool(ConstantPoolType.ConstantInteger(value))
 
@@ -25,52 +27,35 @@ class ClassBuilder {
 
     fun constantDouble(value: Double) = addToPool(ConstantPoolType.ConstantDouble(value))
 
-    private fun nameAndType(
-        name: String,
-        type: String,
-    ) = addToPool(ConstantPoolType.NameAndType(utf8String(name), utf8String(type)))
+    private fun nameAndType(name: String, type: String) =
+        addToPool(ConstantPoolType.NameAndType(utf8String(name), utf8String(type)))
 
     private fun fieldRef(
         classRef: ConstantPoolType.ClassEntry,
         nameAndType: ConstantPoolType.NameAndType,
     ) = addToPool(ConstantPoolType.FieldRef(classRef, nameAndType))
 
-    private fun fieldRef(
-        classRef: ConstantPoolType.ClassEntry,
-        name: String,
-        type: String,
-    ) = fieldRef(classRef, nameAndType(name, type))
+    private fun fieldRef(classRef: ConstantPoolType.ClassEntry, name: String, type: String) =
+        fieldRef(classRef, nameAndType(name, type))
 
-    fun fieldRef(
-        className: String,
-        fieldName: String,
-        type: String,
-    ) = fieldRef(classEntry(className), fieldName, type)
+    fun fieldRef(className: String, fieldName: String, type: String) =
+        fieldRef(classEntry(className), fieldName, type)
 
     private fun methodRef(
         classRef: ConstantPoolType.ClassEntry,
         nameAndType: ConstantPoolType.NameAndType,
     ) = addToPool(ConstantPoolType.MethodRef(classRef, nameAndType))
 
-    private fun methodRef(
-        classRef: ConstantPoolType.ClassEntry,
-        methodName: String,
-        type: String,
-    ) = methodRef(classRef, nameAndType(methodName, type))
+    private fun methodRef(classRef: ConstantPoolType.ClassEntry, methodName: String, type: String) =
+        methodRef(classRef, nameAndType(methodName, type))
 
-    fun methodRef(
-        className: String,
-        methodName: String,
-        type: String,
-    ) = methodRef(classEntry(className), methodName, type)
+    fun methodRef(className: String, methodName: String, type: String) =
+        methodRef(classEntry(className), methodName, type)
 
     private fun classDef(
         access: UShort,
         classRef: ConstantPoolType.ClassEntry,
-        superClassRef: ConstantPoolType.ClassEntry =
-            classEntry(
-                "java/lang/Object",
-            ),
+        superClassRef: ConstantPoolType.ClassEntry = classEntry("java/lang/Object"),
         fields: List<FieldDef>,
         methods: List<MethodDef>,
     ): ClassDef {
@@ -109,9 +94,10 @@ class ClassBuilder {
         dsl.init()
         check(dsl.name.isNotEmpty())
         classVersion = dsl.version
-        val fieldDefs = classDsl.rawFields.map { (access, name, type) ->
-            FieldDef(access, utf8String(name), utf8String(type))
-        }
+        val fieldDefs =
+            classDsl.rawFields.map { (access, name, type) ->
+                FieldDef(access, utf8String(name), utf8String(type))
+            }
         return classDef(dsl.access, dsl.name, dsl.superClass, fieldDefs, classDsl.methods)
     }
 
@@ -123,7 +109,10 @@ class ClassBuilder {
     fun write(): ByteArray {
         val out = ByteCodeWriter()
 
-        val hasBranches = classDef.methods.any { m -> m.instructions.any { it.jumpRef != null || it.jumpTarget != null } }
+        val hasBranches =
+            classDef.methods.any { m ->
+                m.instructions.any { it.jumpRef != null || it.jumpTarget != null }
+            }
         val needsStackMap = classVersion >= 50 && hasBranches
         if (needsStackMap) {
             utf8String("StackMapTable")
@@ -139,7 +128,10 @@ class ClassBuilder {
             for (entry in sortedEntries) {
                 cpMap[entry] = idx
                 idx++
-                if (entry is ConstantPoolType.ConstantLong || entry is ConstantPoolType.ConstantDouble) {
+                if (
+                    entry is ConstantPoolType.ConstantLong ||
+                        entry is ConstantPoolType.ConstantDouble
+                ) {
                     idx++
                 }
             }
@@ -165,15 +157,18 @@ class ClassBuilder {
                 ushort(1u) // attribute count method
                 ushort(cpMap[ConstantPoolType.UTF8String("Code")]!!) // reference to Code attribute
                 val instWriter = ByteCodeWriter()
-                method.instructions.forEach { block -> block.instructions.forEach { it.write(instWriter, cpMap) } }
+                method.instructions.forEach { block ->
+                    block.instructions.forEach { it.write(instWriter, cpMap) }
+                }
                 val instBytes = instWriter.toByteArray()
 
-                val generator = StackMapGenerator(
-                    blocks = method.instructions,
-                    methodSig = method.methodSig.value,
-                    isStatic = (method.access.toInt() and 0x0008) != 0,
-                    thisClassName = classDef.classRef.nameRef.value,
-                )
+                val generator =
+                    StackMapGenerator(
+                        blocks = method.instructions,
+                        methodSig = method.methodSig.value,
+                        isStatic = (method.access.toInt() and 0x0008) != 0,
+                        thisClassName = classDef.classRef.nameRef.value,
+                    )
                 val smtEntries = generator.generate()
                 val smtWriter = ByteCodeWriter()
                 if (needsStackMap) {
@@ -225,7 +220,8 @@ class ClassBuilder {
                 check(dsl.name.isNotEmpty())
                 check(dsl.signature.isNotEmpty())
                 recalculateJumps(methodDsl)
-                val methodDef = methodDef(dsl.access, dsl.name, dsl.signature, methodDsl.instructionBlocks)
+                val methodDef =
+                    methodDef(dsl.access, dsl.name, dsl.signature, methodDsl.instructionBlocks)
                 methods.add(methodDef)
             }
 
@@ -233,21 +229,29 @@ class ClassBuilder {
                 methodDsl.instructionBlocks.forEachIndexed { index, block ->
                     block.jumpTarget?.let { targetRef ->
                         val targetBlock = targetRef.block ?: error("Unbound BlockRef")
-                        val targetIndex = methodDsl.instructionBlocks.indexOfFirst { it === targetBlock }
-                        val jump = calculateJumpOffset(index, targetIndex, methodDsl.instructionBlocks)
+                        val targetIndex =
+                            methodDsl.instructionBlocks.indexOfFirst { it === targetBlock }
+                        val jump =
+                            calculateJumpOffset(index, targetIndex, methodDsl.instructionBlocks)
                         updateJumpInstruction(block, jump)
                     }
                     block.jumpRef?.let { targetLambda ->
                         val targetRef = targetLambda()
                         val targetBlock = targetRef.block ?: error("Unbound BlockRef")
-                        val targetIndex = methodDsl.instructionBlocks.indexOfFirst { it === targetBlock }
-                        val jump = calculateJumpOffset(index, targetIndex, methodDsl.instructionBlocks)
+                        val targetIndex =
+                            methodDsl.instructionBlocks.indexOfFirst { it === targetBlock }
+                        val jump =
+                            calculateJumpOffset(index, targetIndex, methodDsl.instructionBlocks)
                         updateJumpInstruction(block, jump)
                     }
                 }
             }
 
-            private fun calculateJumpOffset(fromIndex: Int, toIndex: Int, blocks: List<InstructionBlock>): Short {
+            private fun calculateJumpOffset(
+                fromIndex: Int,
+                toIndex: Int,
+                blocks: List<InstructionBlock>,
+            ): Short {
                 return if (toIndex > fromIndex) {
                     ((fromIndex + 1 until toIndex).sumOf { blocks[it].byteSize } + 3).toShort()
                 } else {
@@ -259,8 +263,11 @@ class ClassBuilder {
                 when (val inst = block.instructions.last()) {
                     is Instruction.OneArgumentShort -> {
                         when (inst.opcode) {
-                            Opcode.Goto, Opcode.IfNotEqual, Opcode.IfEqual ->
-                                block.instructions[block.instructions.size - 1] = inst.copy(value = jump)
+                            Opcode.Goto,
+                            Opcode.IfNotEqual,
+                            Opcode.IfEqual ->
+                                block.instructions[block.instructions.size - 1] =
+                                    inst.copy(value = jump)
                             else -> error("should be jump")
                         }
                     }
@@ -275,7 +282,9 @@ class ClassBuilder {
         var currentBlock: InstructionBlock? = null
 
         inner class DSL {
-            val parent: ClassDSL.DSL get() = parentDSL
+            val parent: ClassDSL.DSL
+                get() = parentDSL
+
             lateinit var name: String
             lateinit var signature: String
             var access: UShort = 9u
@@ -301,15 +310,21 @@ class ClassBuilder {
             fun label(): BlockRef = BlockRef()
 
             inner class LabelDelegate(private val ref: BlockRef) {
-                operator fun getValue(thisRef: DSL?, property: kotlin.reflect.KProperty<*>): BlockRef = ref
+                operator fun getValue(
+                    thisRef: DSL?,
+                    property: kotlin.reflect.KProperty<*>,
+                ): BlockRef = ref
             }
 
             inner class LabelProvider {
-                operator fun provideDelegate(thisRef: DSL?, property: kotlin.reflect.KProperty<*>): LabelDelegate =
-                    LabelDelegate(BlockRef())
+                operator fun provideDelegate(
+                    thisRef: DSL?,
+                    property: kotlin.reflect.KProperty<*>,
+                ): LabelDelegate = LabelDelegate(BlockRef())
             }
 
-            val label: LabelProvider get() = LabelProvider()
+            val label: LabelProvider
+                get() = LabelProvider()
 
             operator fun BlockRef.invoke(init: DSL.() -> Unit) {
                 val ib = InstructionBlock()
@@ -337,17 +352,17 @@ class ClassBuilder {
                 return ref
             }
 
-            private fun getStatic(field: ConstantPoolType.FieldRef) = add(Instruction.OneArgumentPool(Opcode.GetStatic, field))
+            private fun getStatic(field: ConstantPoolType.FieldRef) =
+                add(Instruction.OneArgumentPool(Opcode.GetStatic, field))
 
-            fun getStatic(
-                className: String,
-                fieldName: String,
-                type: String,
-            ) = getStatic(fieldRef(className, fieldName, type))
+            fun getStatic(className: String, fieldName: String, type: String) =
+                getStatic(fieldRef(className, fieldName, type))
 
-            private fun loadConstant(constant: ConstantPoolType) = add(Instruction.OneArgumentPool(Opcode.LoadConstant, constant))
+            private fun loadConstant(constant: ConstantPoolType) =
+                add(Instruction.OneArgumentPool(Opcode.LoadConstant, constant))
 
-            private fun loadConstant2W(constant: ConstantPoolType) = add(Instruction.OneArgumentPool(Opcode.LoadConstant2W, constant))
+            private fun loadConstant2W(constant: ConstantPoolType) =
+                add(Instruction.OneArgumentPool(Opcode.LoadConstant2W, constant))
 
             private fun iconstm1() = add(Instruction.NoArgument(Opcode.IConstM1))
 
@@ -364,16 +379,23 @@ class ClassBuilder {
             private fun iconst5() = add(Instruction.NoArgument(Opcode.IConst5))
 
             private fun fconst0() = add(Instruction.NoArgument(Opcode.FConst0))
+
             private fun fconst1() = add(Instruction.NoArgument(Opcode.FConst1))
+
             private fun fconst2() = add(Instruction.NoArgument(Opcode.FConst2))
+
             private fun lconst0() = add(Instruction.NoArgument(Opcode.LConst0))
+
             private fun lconst1() = add(Instruction.NoArgument(Opcode.LConst1))
+
             private fun dconst0() = add(Instruction.NoArgument(Opcode.DConst0))
+
             private fun dconst1() = add(Instruction.NoArgument(Opcode.DConst1))
 
             private fun bipush(value: Byte) = add(Instruction.OneArgumentByte(Opcode.BiPush, value))
 
-            private fun sipush(value: Short) = add(Instruction.OneArgumentShort(Opcode.SiPush, value))
+            private fun sipush(value: Short) =
+                add(Instruction.OneArgumentShort(Opcode.SiPush, value))
 
             fun loadConstant(string: String) = loadConstant(constantString(string))
 
@@ -395,92 +417,104 @@ class ClassBuilder {
                     else -> loadConstant(constantInteger(value))
                 }
 
-            fun loadConstant(value: Float) = when {
-                value == 0.0f -> fconst0()
-                value == 1.0f -> fconst1()
-                value == 2.0f -> fconst2()
-                else -> loadConstant(constantFloat(value))
-            }
+            fun loadConstant(value: Float) =
+                when {
+                    value == 0.0f -> fconst0()
+                    value == 1.0f -> fconst1()
+                    value == 2.0f -> fconst2()
+                    else -> loadConstant(constantFloat(value))
+                }
 
-            fun loadConstant(value: Long) = when {
-                value == 0L -> lconst0()
-                value == 1L -> lconst1()
-                else -> loadConstant2W(constantLong(value))
-            }
+            fun loadConstant(value: Long) =
+                when {
+                    value == 0L -> lconst0()
+                    value == 1L -> lconst1()
+                    else -> loadConstant2W(constantLong(value))
+                }
 
-            fun loadConstant(value: Double) = when {
-                value == 0.0 -> dconst0()
-                value == 1.0 -> dconst1()
-                else -> loadConstant2W(constantDouble(value))
-            }
+            fun loadConstant(value: Double) =
+                when {
+                    value == 0.0 -> dconst0()
+                    value == 1.0 -> dconst1()
+                    else -> loadConstant2W(constantDouble(value))
+                }
 
-            private fun invokeVirtual(method: ConstantPoolType.MethodRef) = add(Instruction.OneArgumentPool(Opcode.InvokeVirtual, method))
+            private fun invokeVirtual(method: ConstantPoolType.MethodRef) =
+                add(Instruction.OneArgumentPool(Opcode.InvokeVirtual, method))
 
-            fun invokeVirtual(
-                className: String,
-                methodName: String,
-                type: String,
-            ) = invokeVirtual(methodRef(className, methodName, type))
+            fun invokeVirtual(className: String, methodName: String, type: String) =
+                invokeVirtual(methodRef(className, methodName, type))
 
-            private fun invokeSpecial(method: ConstantPoolType.MethodRef) = add(Instruction.OneArgumentPool(Opcode.InvokeSpecial, method))
+            private fun invokeSpecial(method: ConstantPoolType.MethodRef) =
+                add(Instruction.OneArgumentPool(Opcode.InvokeSpecial, method))
 
-            fun invokeSpecial(
-                className: String,
-                methodName: String,
-                type: String,
-            ) = invokeSpecial(methodRef(className, methodName, type))
+            fun invokeSpecial(className: String, methodName: String, type: String) =
+                invokeSpecial(methodRef(className, methodName, type))
 
-            private fun putField(field: ConstantPoolType.FieldRef) = add(Instruction.OneArgumentPool(Opcode.PutField, field))
+            private fun putField(field: ConstantPoolType.FieldRef) =
+                add(Instruction.OneArgumentPool(Opcode.PutField, field))
 
-            fun putField(
-                className: String,
-                fieldName: String,
-                type: String,
-            ) = putField(fieldRef(className, fieldName, type))
+            fun putField(className: String, fieldName: String, type: String) =
+                putField(fieldRef(className, fieldName, type))
 
-            private fun getField(field: ConstantPoolType.FieldRef) = add(Instruction.OneArgumentPool(Opcode.GetField, field))
+            private fun getField(field: ConstantPoolType.FieldRef) =
+                add(Instruction.OneArgumentPool(Opcode.GetField, field))
 
-            fun getField(
-                className: String,
-                fieldName: String,
-                type: String,
-            ) = getField(fieldRef(className, fieldName, type))
+            fun getField(className: String, fieldName: String, type: String) =
+                getField(fieldRef(className, fieldName, type))
 
-            private fun invokeStatic(method: ConstantPoolType.MethodRef) = add(Instruction.OneArgumentPool(Opcode.InvokeStatic, method))
+            private fun invokeStatic(method: ConstantPoolType.MethodRef) =
+                add(Instruction.OneArgumentPool(Opcode.InvokeStatic, method))
 
-            fun invokeStatic(
-                className: String,
-                methodName: String,
-                type: String,
-            ) = invokeStatic(methodRef(className, methodName, type))
+            fun invokeStatic(className: String, methodName: String, type: String) =
+                invokeStatic(methodRef(className, methodName, type))
 
-            private fun `new`(clazz: ConstantPoolType.ClassEntry) = add(Instruction.OneArgumentPool(Opcode.New, clazz))
+            private fun `new`(clazz: ConstantPoolType.ClassEntry) =
+                add(Instruction.OneArgumentPool(Opcode.New, clazz))
 
             fun `new`(className: String) = `new`(classEntry(className))
 
             fun `return`() = add(Instruction.NoArgument(Opcode.Return))
 
             fun ireturn() = add(Instruction.NoArgument(Opcode.IReturn))
+
             fun lreturn() = add(Instruction.NoArgument(Opcode.LReturn))
+
             fun freturn() = add(Instruction.NoArgument(Opcode.FReturn))
+
             fun dreturn() = add(Instruction.NoArgument(Opcode.DReturn))
+
             fun areturn() = add(Instruction.NoArgument(Opcode.AReturn))
 
-            fun astore(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.AStore, localVar(identifier)))
+            fun astore(identifier: String) =
+                add(Instruction.OneArgumentUByte(Opcode.AStore, localVar(identifier)))
 
-            fun aload(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.ALoad, localVar(identifier)))
+            fun aload(identifier: String) =
+                add(Instruction.OneArgumentUByte(Opcode.ALoad, localVar(identifier)))
 
-            fun istore(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.IStore, localVar(identifier)))
-            fun iload(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.ILoad, localVar(identifier)))
+            fun istore(identifier: String) =
+                add(Instruction.OneArgumentUByte(Opcode.IStore, localVar(identifier)))
 
-            fun lstore(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.LStore, localVar(identifier)))
-            fun lload(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.LLoad, localVar(identifier)))
+            fun iload(identifier: String) =
+                add(Instruction.OneArgumentUByte(Opcode.ILoad, localVar(identifier)))
 
-            fun fstore(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.FStore, localVar(identifier)))
-            fun fload(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.FLoad, localVar(identifier)))
+            fun lstore(identifier: String) =
+                add(Instruction.OneArgumentUByte(Opcode.LStore, localVar(identifier)))
 
-            fun dstore(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.DStore, localVar(identifier)))
-            fun dload(identifier: String) = add(Instruction.OneArgumentUByte(Opcode.DLoad, localVar(identifier)))
+            fun lload(identifier: String) =
+                add(Instruction.OneArgumentUByte(Opcode.LLoad, localVar(identifier)))
+
+            fun fstore(identifier: String) =
+                add(Instruction.OneArgumentUByte(Opcode.FStore, localVar(identifier)))
+
+            fun fload(identifier: String) =
+                add(Instruction.OneArgumentUByte(Opcode.FLoad, localVar(identifier)))
+
+            fun dstore(identifier: String) =
+                add(Instruction.OneArgumentUByte(Opcode.DStore, localVar(identifier)))
+
+            fun dload(identifier: String) =
+                add(Instruction.OneArgumentUByte(Opcode.DLoad, localVar(identifier)))
 
             fun dup() = add(Instruction.NoArgument(Opcode.Dup))
 
@@ -492,14 +526,23 @@ class ClassBuilder {
 
             fun goto(jump: Short) = add(Instruction.OneArgumentShort(Opcode.Goto, jump))
 
-            fun goto(target: BlockRef) = addJump(Instruction.OneArgumentShort(Opcode.Goto, 0)) { target }
-            fun goto(target: () -> BlockRef) = addJump(Instruction.OneArgumentShort(Opcode.Goto, 0), target)
+            fun goto(target: BlockRef) =
+                addJump(Instruction.OneArgumentShort(Opcode.Goto, 0)) { target }
 
-            fun ifequal(target: BlockRef) = addJump(Instruction.OneArgumentShort(Opcode.IfEqual, 0)) { target }
-            fun ifequal(target: () -> BlockRef) = addJump(Instruction.OneArgumentShort(Opcode.IfEqual, 0), target)
+            fun goto(target: () -> BlockRef) =
+                addJump(Instruction.OneArgumentShort(Opcode.Goto, 0), target)
 
-            fun ifnotequal(target: BlockRef) = addJump(Instruction.OneArgumentShort(Opcode.IfNotEqual, 0)) { target }
-            fun ifnotequal(target: () -> BlockRef) = addJump(Instruction.OneArgumentShort(Opcode.IfNotEqual, 0), target)
+            fun ifequal(target: BlockRef) =
+                addJump(Instruction.OneArgumentShort(Opcode.IfEqual, 0)) { target }
+
+            fun ifequal(target: () -> BlockRef) =
+                addJump(Instruction.OneArgumentShort(Opcode.IfEqual, 0), target)
+
+            fun ifnotequal(target: BlockRef) =
+                addJump(Instruction.OneArgumentShort(Opcode.IfNotEqual, 0)) { target }
+
+            fun ifnotequal(target: () -> BlockRef) =
+                addJump(Instruction.OneArgumentShort(Opcode.IfNotEqual, 0), target)
 
             private fun addJump(instruction: Instruction, target: () -> BlockRef) {
                 val block = currentBlock ?: InstructionBlock().also { instructionBlocks.add(it) }

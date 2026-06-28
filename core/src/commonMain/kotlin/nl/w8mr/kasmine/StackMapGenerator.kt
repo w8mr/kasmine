@@ -11,10 +11,13 @@ class StackMapGenerator(
     private val thisClassName: String,
 ) {
     private val allInstructions: List<FlatInstruction> by lazy { flattenInstructions() }
-    private val offsetToIndex: Map<Int, Int> by lazy { allInstructions.mapIndexed { i, fi -> fi.offset to i }.toMap() }
+    private val offsetToIndex: Map<Int, Int> by lazy {
+        allInstructions.mapIndexed { i, fi -> fi.offset to i }.toMap()
+    }
 
     var maxStack: Int = 0
         private set
+
     var maxLocals: Int = 0
         private set
 
@@ -78,7 +81,8 @@ class StackMapGenerator(
 
         while (worklist.isNotEmpty()) {
             val startOffset = worklist.removeFirst()
-            val currentFrame = framesAtTargets[startOffset] ?: error("No frame for offset $startOffset")
+            val currentFrame =
+                framesAtTargets[startOffset] ?: error("No frame for offset $startOffset")
             simulate(currentFrame, startOffset, targets, framesAtTargets, worklist)
         }
 
@@ -132,7 +136,11 @@ class StackMapGenerator(
             for (expectedPop in effect.pops) {
                 if (frame.stack.isNotEmpty()) {
                     frame.stack.removeAt(frame.stack.lastIndex)
-                    if (expectedPop.slots() == 2 && frame.stack.isNotEmpty() && frame.stack.last() is VerificationType.Top) {
+                    if (
+                        expectedPop.slots() == 2 &&
+                            frame.stack.isNotEmpty() &&
+                            frame.stack.last() is VerificationType.Top
+                    ) {
                         frame.stack.removeAt(frame.stack.lastIndex)
                     }
                 }
@@ -225,18 +233,30 @@ class StackMapGenerator(
                 return
             }
 
-            if (inst is Instruction.OneArgumentShort && (inst.opcode == Opcode.IfNotEqual || inst.opcode == Opcode.IfEqual)) {
+            if (
+                inst is Instruction.OneArgumentShort &&
+                    (inst.opcode == Opcode.IfNotEqual || inst.opcode == Opcode.IfEqual)
+            ) {
                 recordBranchTarget(inst, frame, framesAtTargets, worklist)
                 continue
             }
 
-            if (inst is Instruction.NoArgument &&
-                (inst.opcode == Opcode.Return || inst.opcode == Opcode.IReturn || inst.opcode == Opcode.LReturn ||
-                 inst.opcode == Opcode.FReturn || inst.opcode == Opcode.DReturn || inst.opcode == Opcode.AReturn)) {
+            if (
+                inst is Instruction.NoArgument &&
+                    (inst.opcode == Opcode.Return ||
+                        inst.opcode == Opcode.IReturn ||
+                        inst.opcode == Opcode.LReturn ||
+                        inst.opcode == Opcode.FReturn ||
+                        inst.opcode == Opcode.DReturn ||
+                        inst.opcode == Opcode.AReturn)
+            ) {
                 return
             }
 
-            if (currentOffset >= allInstructions.last().offset + allInstructions.last().instruction.byteSize) {
+            if (
+                currentOffset >=
+                    allInstructions.last().offset + allInstructions.last().instruction.byteSize
+            ) {
                 return
             }
         }
@@ -250,7 +270,8 @@ class StackMapGenerator(
     ) {
         for (block in blocks) {
             if (block.instructions.lastOrNull() !== inst) continue
-            val targetBlock = block.jumpTarget?.block ?: block.jumpRef?.let { it().block } ?: continue
+            val targetBlock =
+                block.jumpTarget?.block ?: block.jumpRef?.let { it().block } ?: continue
             val targetOff = findTargetOffset(targetBlock)
             val existing = framesAtTargets[targetOff]
             val targetFrame = frame.copy()
@@ -265,54 +286,95 @@ class StackMapGenerator(
         }
     }
 
-    private fun computeEffect(inst: Instruction, offset: Int): TypeEffect = when {
-        inst is Instruction.OneArgumentPool && inst.opcode == Opcode.New ->
-            TypeEffect(emptyList(), listOf(VerificationType.Uninitialized(offset.toUShort())))
+    private fun computeEffect(inst: Instruction, offset: Int): TypeEffect =
+        when {
+            inst is Instruction.OneArgumentPool && inst.opcode == Opcode.New ->
+                TypeEffect(emptyList(), listOf(VerificationType.Uninitialized(offset.toUShort())))
 
-        inst is Instruction.OneArgumentPool && (inst.opcode == Opcode.InvokeVirtual || inst.opcode == Opcode.InvokeSpecial) -> {
-            val methodRef = inst.value as? ConstantPoolType.MethodRef
-            val returnType = methodRef?.let { VerificationType.returnTypeFromMethodDescriptor(it.nameAndTypeRef.typeRef.value) } ?: VerificationType.Top
-            val paramTypes = methodRef?.let { VerificationType.parameterTypesFromMethodDescriptor(it.nameAndTypeRef.typeRef.value) } ?: emptyList()
-            val allPops = mutableListOf<VerificationType>()
-            allPops.addAll(paramTypes.reversed())
-            allPops.add(VerificationType.Top)
-            val pushes = if (returnType is VerificationType.Top) emptyList() else listOf(returnType)
-            TypeEffect(allPops, pushes)
-        }
-
-        inst is Instruction.OneArgumentPool && inst.opcode == Opcode.InvokeStatic -> {
-            val methodRef = inst.value as? ConstantPoolType.MethodRef
-            val returnType = methodRef?.let { VerificationType.returnTypeFromMethodDescriptor(it.nameAndTypeRef.typeRef.value) } ?: VerificationType.Top
-            val paramTypes = methodRef?.let { VerificationType.parameterTypesFromMethodDescriptor(it.nameAndTypeRef.typeRef.value) } ?: emptyList()
-            TypeEffect(paramTypes.reversed(), if (returnType is VerificationType.Top) emptyList() else listOf(returnType))
-        }
-
-        inst is Instruction.OneArgumentPool && (inst.opcode == Opcode.GetStatic || inst.opcode == Opcode.GetField) -> {
-            val fieldRef = inst.value as? ConstantPoolType.FieldRef
-            val fieldType = fieldRef?.let { VerificationType.fromFieldDescriptor(it.nameAndTypeRef.typeRef.value) } ?: VerificationType.Top
-            val pops = if (inst.opcode == Opcode.GetField) listOf(VerificationType.Top) else emptyList()
-            TypeEffect(pops, listOf(fieldType))
-        }
-
-        inst is Instruction.OneArgumentPool && inst.opcode == Opcode.PutField -> {
-            val fieldRef = inst.value as? ConstantPoolType.FieldRef
-            val fieldType = fieldRef?.let { VerificationType.fromFieldDescriptor(it.nameAndTypeRef.typeRef.value) } ?: VerificationType.Top
-            TypeEffect(listOf(fieldType, VerificationType.Top), emptyList())
-        }
-
-        inst is Instruction.OneArgumentPool && inst.opcode == Opcode.LoadConstant -> {
-            val t = when (inst.value) {
-                is ConstantPoolType.ConstantString -> VerificationType.Object("java/lang/String")
-                is ConstantPoolType.ConstantInteger -> VerificationType.Integer
-                else -> VerificationType.Top
+            inst is Instruction.OneArgumentPool &&
+                (inst.opcode == Opcode.InvokeVirtual || inst.opcode == Opcode.InvokeSpecial) -> {
+                val methodRef = inst.value as? ConstantPoolType.MethodRef
+                val returnType =
+                    methodRef?.let {
+                        VerificationType.returnTypeFromMethodDescriptor(
+                            it.nameAndTypeRef.typeRef.value
+                        )
+                    } ?: VerificationType.Top
+                val paramTypes =
+                    methodRef?.let {
+                        VerificationType.parameterTypesFromMethodDescriptor(
+                            it.nameAndTypeRef.typeRef.value
+                        )
+                    } ?: emptyList()
+                val allPops = mutableListOf<VerificationType>()
+                allPops.addAll(paramTypes.reversed())
+                allPops.add(VerificationType.Top)
+                val pushes =
+                    if (returnType is VerificationType.Top) emptyList() else listOf(returnType)
+                TypeEffect(allPops, pushes)
             }
-            TypeEffect(emptyList(), listOf(t))
+
+            inst is Instruction.OneArgumentPool && inst.opcode == Opcode.InvokeStatic -> {
+                val methodRef = inst.value as? ConstantPoolType.MethodRef
+                val returnType =
+                    methodRef?.let {
+                        VerificationType.returnTypeFromMethodDescriptor(
+                            it.nameAndTypeRef.typeRef.value
+                        )
+                    } ?: VerificationType.Top
+                val paramTypes =
+                    methodRef?.let {
+                        VerificationType.parameterTypesFromMethodDescriptor(
+                            it.nameAndTypeRef.typeRef.value
+                        )
+                    } ?: emptyList()
+                TypeEffect(
+                    paramTypes.reversed(),
+                    if (returnType is VerificationType.Top) emptyList() else listOf(returnType),
+                )
+            }
+
+            inst is Instruction.OneArgumentPool &&
+                (inst.opcode == Opcode.GetStatic || inst.opcode == Opcode.GetField) -> {
+                val fieldRef = inst.value as? ConstantPoolType.FieldRef
+                val fieldType =
+                    fieldRef?.let {
+                        VerificationType.fromFieldDescriptor(it.nameAndTypeRef.typeRef.value)
+                    } ?: VerificationType.Top
+                val pops =
+                    if (inst.opcode == Opcode.GetField) listOf(VerificationType.Top)
+                    else emptyList()
+                TypeEffect(pops, listOf(fieldType))
+            }
+
+            inst is Instruction.OneArgumentPool && inst.opcode == Opcode.PutField -> {
+                val fieldRef = inst.value as? ConstantPoolType.FieldRef
+                val fieldType =
+                    fieldRef?.let {
+                        VerificationType.fromFieldDescriptor(it.nameAndTypeRef.typeRef.value)
+                    } ?: VerificationType.Top
+                TypeEffect(listOf(fieldType, VerificationType.Top), emptyList())
+            }
+
+            inst is Instruction.OneArgumentPool && inst.opcode == Opcode.LoadConstant -> {
+                val t =
+                    when (inst.value) {
+                        is ConstantPoolType.ConstantString ->
+                            VerificationType.Object("java/lang/String")
+                        is ConstantPoolType.ConstantInteger -> VerificationType.Integer
+                        else -> VerificationType.Top
+                    }
+                TypeEffect(emptyList(), listOf(t))
+            }
+
+            else -> inst.typeEffect { VerificationType.Top }
         }
 
-        else -> inst.typeEffect { VerificationType.Top }
-    }
-
-    fun writeStackMap(out: ByteCodeWriter, cpMap: Map<ConstantPoolType, Int>, entries: List<StackMapEntry>) {
+    fun writeStackMap(
+        out: ByteCodeWriter,
+        cpMap: Map<ConstantPoolType, Int>,
+        entries: List<StackMapEntry>,
+    ) {
         val smtUtf8 = ConstantPoolType.UTF8String("StackMapTable")
 
         val smtWriter = ByteCodeWriter()
@@ -327,7 +389,11 @@ class StackMapGenerator(
         out.write(smtBytes)
     }
 
-    private fun writeFrame(out: ByteCodeWriter, entry: StackMapEntry, cpMap: Map<ConstantPoolType, Int>) {
+    private fun writeFrame(
+        out: ByteCodeWriter,
+        entry: StackMapEntry,
+        cpMap: Map<ConstantPoolType, Int>,
+    ) {
         val locals = trimTrailingTop(entry.frame.locals)
         val stack = entry.frame.stack
 

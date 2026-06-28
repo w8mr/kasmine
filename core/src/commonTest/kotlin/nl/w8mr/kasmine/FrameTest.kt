@@ -1,17 +1,19 @@
 package nl.w8mr.kasmine
 
-import kotlin.test.Test
 import kotlin.test.*
+import kotlin.test.Test
 
 class FrameTest {
 
-    @Test fun `push and pop round trip`() {
+    @Test
+    fun `push and pop round trip`() {
         val f = Frame()
         f.push(VerificationType.Integer)
         assertEquals(VerificationType.Integer, f.pop())
     }
 
-    @Test fun `pop returns most recently pushed`() {
+    @Test
+    fun `pop returns most recently pushed`() {
         val f = Frame()
         f.push(VerificationType.Integer)
         f.push(VerificationType.Float)
@@ -19,12 +21,14 @@ class FrameTest {
         assertEquals(VerificationType.Integer, f.pop())
     }
 
-    @Test fun `pop from empty stack throws`() {
+    @Test
+    fun `pop from empty stack throws`() {
         val f = Frame()
         assertFails { f.pop() }
     }
 
-    @Test fun `pop count returns reversed order`() {
+    @Test
+    fun `pop count returns reversed order`() {
         val f = Frame()
         f.push(VerificationType.Integer)
         f.push(VerificationType.Float)
@@ -34,13 +38,15 @@ class FrameTest {
         assertEquals(1, f.stack.size)
     }
 
-    @Test fun `setLocal stores at index`() {
+    @Test
+    fun `setLocal stores at index`() {
         val f = Frame()
         f.setLocal(0, VerificationType.Integer)
         assertEquals(VerificationType.Integer, f.local(0))
     }
 
-    @Test fun `setLocal adds Top to fill gaps`() {
+    @Test
+    fun `setLocal adds Top to fill gaps`() {
         val f = Frame()
         f.setLocal(2, VerificationType.Float)
         assertEquals(VerificationType.Top, f.local(0))
@@ -48,12 +54,14 @@ class FrameTest {
         assertEquals(VerificationType.Float, f.local(2))
     }
 
-    @Test fun `local out of bounds returns Top`() {
+    @Test
+    fun `local out of bounds returns Top`() {
         val f = Frame()
         assertEquals(VerificationType.Top, f.local(99))
     }
 
-    @Test fun `clearStack empties the stack`() {
+    @Test
+    fun `clearStack empties the stack`() {
         val f = Frame()
         f.push(VerificationType.Integer)
         f.push(VerificationType.Float)
@@ -61,7 +69,8 @@ class FrameTest {
         assertTrue(f.stack.isEmpty())
     }
 
-    @Test fun `copy is independent`() {
+    @Test
+    fun `copy is independent`() {
         val f = Frame()
         f.setLocal(0, VerificationType.Integer)
         f.push(VerificationType.Float)
@@ -72,7 +81,8 @@ class FrameTest {
         assertEquals(1, copy.stack.size)
     }
 
-    @Test fun `merge identical frame returns false`() {
+    @Test
+    fun `merge identical frame returns false`() {
         val f = Frame()
         f.setLocal(0, VerificationType.Integer)
         val g = Frame()
@@ -81,7 +91,8 @@ class FrameTest {
         assertEquals(VerificationType.Integer, f.local(0))
     }
 
-    @Test fun `merge different locals returns true and updates`() {
+    @Test
+    fun `merge different locals returns true and updates`() {
         val f = Frame()
         f.setLocal(0, VerificationType.Integer)
         val g = Frame()
@@ -90,7 +101,8 @@ class FrameTest {
         assertEquals(VerificationType.Top, f.local(0))
     }
 
-    @Test fun `merge with larger frame extends locals`() {
+    @Test
+    fun `merge with larger frame extends locals`() {
         val f = Frame()
         f.setLocal(0, VerificationType.Integer)
         val g = Frame()
@@ -101,7 +113,8 @@ class FrameTest {
         assertEquals(VerificationType.Float, f.local(2))
     }
 
-    @Test fun `merge Object with Null keeps Object`() {
+    @Test
+    fun `merge Object with Null keeps Object`() {
         val f = Frame()
         f.setLocal(0, VerificationType.Object("Foo"))
         val g = Frame()
@@ -110,7 +123,8 @@ class FrameTest {
         assertEquals(VerificationType.Object("Foo"), f.local(0))
     }
 
-    @Test fun `pop count requirement fails when stack too small`() {
+    @Test
+    fun `pop count requirement fails when stack too small`() {
         val f = Frame()
         f.push(VerificationType.Integer)
         assertFails { f.pop(3) }
