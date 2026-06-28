@@ -1,5 +1,6 @@
 plugins {
     kotlin("multiplatform")
+    id("com.vanniktech.maven.publish")
 }
 
 group = parent?.group ?: group
@@ -56,4 +57,47 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+mavenPublishing {
+    configure(
+        com.vanniktech.maven.publish.KotlinMultiplatform(
+            javadocJar = com.vanniktech.maven.publish.JavadocJar.Empty()
+        )
+    )
+    publishToMavenCentral()
+
+    coordinates("nl.w8mr.kasmine", "core", "0.0.5")
+
+    pom {
+        name.set("Kasmine Core")
+        description.set("A library for writing JVM bytecode in Kotlin")
+        inceptionYear.set("2023")
+        url.set("https://github.com/w8mr/kasmine")
+        licenses {
+            license {
+                name.set("MIT License")
+                url.set("https://opensource.org/license/mit")
+                distribution.set("https://opensource.org/license/mit")
+            }
+        }
+        issueManagement {
+            system.set("Github")
+            url.set("https://github.com/w8mr/kasmine/issues")
+        }
+        developers {
+            developer {
+                id.set("w8mr")
+                name.set("Elmar Wachtmeester")
+                url.set("https://github.com/w8mr")
+            }
+        }
+        scm {
+            url.set("https://github.com/w8mr/kasmine")
+            connection.set("scm:git:git://github.com/w8mr/kasmine.git")
+            developerConnection.set("scm:git:ssh://git@github.com/w8mr/kasmine.git")
+        }
+
+    }
+    signAllPublications()
 }

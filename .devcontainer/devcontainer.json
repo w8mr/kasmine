@@ -1,0 +1,15 @@
+{
+    "name": "Kasmine Development",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "fwcd.kotlin",
+                "vscjava.vscode-gradle"
+            ]
+        }
+    },
+    "remoteUser": "codespace"
+}
