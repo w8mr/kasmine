@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "nl.w8mr.kasmine"
-version = "0.0.5"
+version = "0.1.1"
 
 allprojects {
     repositories {

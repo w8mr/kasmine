@@ -59,7 +59,7 @@ mavenPublishing {
     )
     publishToMavenCentral()
 
-    coordinates("nl.w8mr.kasmine", "core", "0.0.5")
+    coordinates("nl.w8mr.kasmine", "core", "0.1.1")
 
     pom {
         name.set("Kasmine Core")
