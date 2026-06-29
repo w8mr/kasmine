@@ -596,6 +596,31 @@ class ClassBuilderTest {
     }
 
     @Test
+    fun `branch with String parameter fails with UTF8String instead of ClassEntry lookup`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            classBuilder {
+                access = 33u
+                name = "StringParamBranch"
+                method {
+                    access = 9u
+                    name = "run"
+                    signature = "(Ljava/lang/String;)I"
+                    val end = label()
+                    aload("x")
+                    ifequal(end)
+                    loadConstant(0)
+                    ireturn()
+                    end {
+                        loadConstant(1)
+                        ireturn()
+                    }
+                    parameter("x")
+                }
+            }.write()
+        }
+    }
+
+    @Test
     fun `float load store and return`() {
         val myClass = classBuilder {
             access = 33u
