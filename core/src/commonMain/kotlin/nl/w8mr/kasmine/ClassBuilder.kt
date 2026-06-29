@@ -117,6 +117,23 @@ class ClassBuilder {
         val needsStackMap = classVersion >= 50 && hasBranches
         if (needsStackMap) {
             utf8String("StackMapTable")
+            for (method in classDef.methods) {
+                val generator =
+                    StackMapGenerator(
+                        blocks = method.instructions,
+                        methodSig = method.methodSig.value,
+                        isStatic = (method.access.toInt() and 0x0008) != 0,
+                        thisClassName = classDef.classRef.nameRef.value,
+                    )
+                for (entry in generator.generate()) {
+                    for (local in entry.frame.locals) {
+                        if (local is VerificationType.Object) classEntry(local.className)
+                    }
+                    for (s in entry.frame.stack) {
+                        if (s is VerificationType.Object) classEntry(s.className)
+                    }
+                }
+            }
         }
 
         with(out) {

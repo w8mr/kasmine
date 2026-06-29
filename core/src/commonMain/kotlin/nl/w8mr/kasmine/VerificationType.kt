@@ -40,7 +40,7 @@ sealed class VerificationType {
         out.ubyte(tag().toUByte())
         when (this) {
             is Object -> {
-                val idx = cpMap[ConstantPoolType.UTF8String(className)]
+                val idx = cpMap[ConstantPoolType.ClassEntry(ConstantPoolType.UTF8String(className))]
                 require(idx != null) { "Class '$className' not in constant pool for stack map" }
                 out.ushort(idx)
             }

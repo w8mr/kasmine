@@ -596,28 +596,32 @@ class ClassBuilderTest {
     }
 
     @Test
-    fun `branch with String parameter fails with UTF8String instead of ClassEntry lookup`() {
-        assertThrows(IllegalArgumentException::class.java) {
-            classBuilder {
-                access = 33u
-                name = "StringParamBranch"
-                method {
-                    access = 9u
-                    name = "run"
-                    signature = "(Ljava/lang/String;)I"
-                    val end = label()
-                    aload("x")
-                    ifequal(end)
-                    loadConstant(0)
+    fun `branch with String parameter generates valid StackMapTable`() {
+        val bytes = classBuilder {
+            access = 33u
+            name = "StringParamBranch"
+            method {
+                access = 9u
+                name = "run"
+                signature = "(Ljava/lang/String;)I"
+                parameter("x")
+                val end = label()
+                loadConstant(42)
+                loadConstant(0)
+                ifequal(end)
+                loadConstant(0)
+                ireturn()
+                end {
+                    loadConstant(1)
                     ireturn()
-                    end {
-                        loadConstant(1)
-                        ireturn()
-                    }
-                    parameter("x")
                 }
-            }.write()
-        }
+            }
+        }.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("StringParamBranch", bytes)
+        val method = clazz.getMethod("run", String::class.java)
+        assertEquals(1, method.invoke(null, ""))
+        assertEquals(1, method.invoke(null, "hello"))
     }
 
     @Test
