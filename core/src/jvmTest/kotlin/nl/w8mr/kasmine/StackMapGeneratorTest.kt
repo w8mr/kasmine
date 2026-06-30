@@ -194,7 +194,7 @@ class StackMapGeneratorTest {
 
         val g = generator(listOf(main, fallthrough, target), "()I", isStatic = true)
         val entries = g.generate()
-        assertEquals(1, entries.size)
+        assertEquals(2, entries.size)
     }
 
     @Test

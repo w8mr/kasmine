@@ -55,11 +55,17 @@ class StackMapGenerator(
 
     private fun branchTargets(): Set<Int> {
         val targets = mutableSetOf<Int>()
-        blocks.forEach { block ->
+        blocks.forEachIndexed { index, block ->
             block.jumpTarget?.let { it.block?.let { b -> targets.add(findTargetOffset(b)) } }
             block.jumpRef?.let { lambda ->
                 val ref = lambda()
                 ref.block?.let { targets.add(findTargetOffset(it)) }
+            }
+            val last = block.instructions.lastOrNull()
+            if (last is Instruction.OneArgumentShort && last.opcode == Opcode.Goto) {
+                if (index + 1 < blocks.size) {
+                    targets.add(findTargetOffset(blocks[index + 1]))
+                }
             }
         }
         return targets
@@ -180,7 +186,22 @@ class StackMapGenerator(
             currentOffset = fi.offset + inst.byteSize
 
             val shouldReturn = handleBranchInstruction(inst, frame, framesAtTargets, worklist)
-            if (shouldReturn) return
+            if (shouldReturn) {
+                if (inst is Instruction.OneArgumentShort && inst.opcode == Opcode.Goto) {
+                    val nextOffset = fi.offset + inst.byteSize
+                    if (nextOffset <= allInstructions.last().offset) {
+                        val existing = framesAtTargets[nextOffset]
+                        if (existing != null) {
+                            if (existing.merge(frame)) {
+                                worklist.add(nextOffset)
+                            }
+                        } else {
+                            framesAtTargets[nextOffset] = frame.copy()
+                        }
+                    }
+                }
+                return
+            }
 
             if (
                 currentOffset >=

@@ -354,27 +354,22 @@ class ClassBuilder {
                 get() = LabelProvider()
 
             /**
-             * Creates a new instruction block for this label and runs [init] inside it. After the
-             * lambda the current block is restored to its previous value. Use [nextBlock] if you
-             * need to break the restore and start a fresh block.
+             * Creates a new instruction block for this label and runs [init] inside it.
+             * After the lambda, [currentBlock] is left as whatever the last instruction in
+             * [init] left it — if it ended with a jump it will be null; otherwise subsequent
+             * instructions flow into this block.
              */
             operator fun BlockRef.invoke(init: DSL.() -> Unit) {
                 val ib = InstructionBlock()
                 this.block = ib
                 instructionBlocks.add(ib)
-                val prevBlock = currentBlock
-                val prevSelf = self
                 currentBlock = ib
                 self = this
                 this@DSL.init()
-                currentBlock = prevBlock
-                self = prevSelf
             }
 
             /**
-             * Ends the current block so the next instruction starts a fresh block. Use this after
-             * label blocks ([BlockRef.invoke]) when subsequent instructions should not be appended
-             * to the pre-label block.
+             * Ends the current block so the next instruction starts a fresh block.
              */
             fun nextBlock() {
                 currentBlock = null
@@ -383,13 +378,9 @@ class ClassBuilder {
             fun block(init: DSL.() -> Unit): BlockRef {
                 val ref = BlockRef().also { it.block = InstructionBlock() }
                 instructionBlocks.add(ref.block!!)
-                val prevBlock = currentBlock
-                val prevSelf = self
                 currentBlock = ref.block
                 self = ref
                 this.init()
-                currentBlock = prevBlock
-                self = prevSelf
                 return ref
             }
 
