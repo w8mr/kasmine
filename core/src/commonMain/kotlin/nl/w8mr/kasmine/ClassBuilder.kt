@@ -368,13 +368,6 @@ class ClassBuilder {
                 this@DSL.init()
             }
 
-            /**
-             * Ends the current block so the next instruction starts a fresh block.
-             */
-            fun nextBlock() {
-                currentBlock = null
-            }
-
             fun block(init: DSL.() -> Unit): BlockRef {
                 val ref = BlockRef().also { it.block = InstructionBlock() }
                 instructionBlocks.add(ref.block!!)

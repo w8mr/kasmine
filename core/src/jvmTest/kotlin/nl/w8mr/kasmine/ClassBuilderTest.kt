@@ -753,10 +753,10 @@ class ClassBuilderTest {
     }
 
     @Test
-    fun `label block without nextBlock appends subsequent instructions to outer block`() {
+    fun `instructions after skip block fall through into it`() {
         val myClass = classBuilder {
             access = 33u
-            name = "NoNextBlock"
+            name = "AfterSkip"
             version = 52
             method {
                 access = 9u
@@ -770,14 +770,13 @@ class ClassBuilderTest {
                 loadConstant(1)
                 ireturn()
                 skip {}
-                nextBlock()
                 loadConstant(99)
                 ireturn()
             }
         }
         val bytes = myClass.write()
         val loader = DynamicClassLoader(null)
-        val clazz = loader.define("NoNextBlock", bytes)
+        val clazz = loader.define("AfterSkip", bytes)
         val method = clazz.getMethod("run")
         assertEquals(99, method.invoke(null))
     }
