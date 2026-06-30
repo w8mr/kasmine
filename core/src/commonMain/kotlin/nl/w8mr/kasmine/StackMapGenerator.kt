@@ -79,12 +79,36 @@ class StackMapGenerator(
         return frame
     }
 
+    private fun computeMaxLocals(): Int {
+        var maxIdx = -1
+        for (fi in allInstructions) {
+            if (fi.instruction is Instruction.OneArgumentUByte) {
+                val opcode = fi.instruction.opcode
+                val localIdx = fi.instruction.value.toInt()
+                when (opcode) {
+                    Opcode.ILoad,
+                    Opcode.LLoad,
+                    Opcode.FLoad,
+                    Opcode.DLoad,
+                    Opcode.ALoad,
+                    Opcode.IStore,
+                    Opcode.LStore,
+                    Opcode.FStore,
+                    Opcode.DStore,
+                    Opcode.AStore -> maxIdx = maxOf(maxIdx, localIdx)
+                    else -> {}
+                }
+            }
+        }
+        return maxOf(initialFrame().locals.size, maxIdx + 1)
+    }
+
     fun generate(): List<StackMapEntry> {
         val framesAtTargets = mutableMapOf<Int, Frame>()
         val worklist = ArrayDeque<Int>()
 
         val initial = initialFrame()
-        maxLocals = initial.locals.size
+        maxLocals = computeMaxLocals()
         framesAtTargets[0] = initial.copy()
         worklist.add(0)
 
@@ -143,10 +167,16 @@ class StackMapGenerator(
             }
 
             val effect = computeEffect(inst, fi.offset)
+            val storeType =
+                if (inst is Instruction.OneArgumentUByte && inst.opcode == Opcode.AStore) {
+                    frame.stack.lastOrNull()
+                } else {
+                    null
+                }
             applyTypeEffect(frame, effect)
             maxStack = maxOf(maxStack, frame.stack.size)
 
-            handleLocalVariable(frame, inst)
+            handleLocalVariable(frame, inst, storeType)
             currentOffset = fi.offset + inst.byteSize
 
             val shouldReturn = handleBranchInstruction(inst, frame, framesAtTargets, worklist)
@@ -182,7 +212,12 @@ class StackMapGenerator(
         }
     }
 
-    private fun handleLocalVariable(frame: Frame, inst: Instruction) {
+    @Suppress("CyclomaticComplexMethod")
+    private fun handleLocalVariable(
+        frame: Frame,
+        inst: Instruction,
+        storeType: VerificationType? = null,
+    ) {
         if (inst !is Instruction.OneArgumentUByte) return
         val localIdx = inst.value.toInt()
         when (inst.opcode) {
@@ -209,7 +244,10 @@ class StackMapGenerator(
                 maxLocals = maxOf(maxLocals, frame.locals.size)
             }
             Opcode.AStore -> {
-                frame.setLocal(localIdx, VerificationType.Top)
+                val actualType =
+                    storeType?.let { if (it is VerificationType.Top) null else it }
+                        ?: VerificationType.Top
+                frame.setLocal(localIdx, actualType)
                 maxLocals = maxOf(maxLocals, frame.locals.size)
             }
             Opcode.ILoad,

@@ -312,4 +312,92 @@ class StackMapGeneratorTest {
         val entries = g.generate()
         assertTrue(entries.size >= 2)
     }
+
+    @Test
+    fun `AStore preserves reference type from stack at branch target`() {
+        val target = InstructionBlock()
+        target.add(Instruction.OneArgumentUByte(Opcode.ALoad, 1u))
+        target.add(Instruction.NoArgument(Opcode.AReturn))
+
+        val main = InstructionBlock()
+        main.add(Instruction.OneArgumentUByte(Opcode.ALoad, 0u))
+        main.add(Instruction.OneArgumentUByte(Opcode.AStore, 1u))
+        val goto = Instruction.OneArgumentShort(Opcode.Goto, 0)
+        main.add(goto)
+        main.jumpsTo(target)
+
+        val g =
+            generator(
+                listOf(main, target),
+                "(Ljava/lang/String;)Ljava/lang/String;",
+                isStatic = true,
+            )
+        val entries = g.generate()
+        assertTrue(entries.isNotEmpty())
+        val frame = entries.first().frame
+        assertEquals(
+            VerificationType.Object("java/lang/String"),
+            frame.local(1),
+            "astore should track the reference type popped from stack, not Top",
+        )
+    }
+
+    @Test
+    fun `maxLocals accounts for LOAD instructions not just stores`() {
+        val target = InstructionBlock()
+        target.add(Instruction.NoArgument(Opcode.Return))
+
+        val main = InstructionBlock()
+        main.add(Instruction.OneArgumentUByte(Opcode.ALoad, 4u))
+        val goto = Instruction.OneArgumentShort(Opcode.Goto, 0)
+        main.add(goto)
+        main.jumpsTo(target)
+
+        val g = generator(listOf(main, target), "()V", isStatic = true)
+        g.generate()
+        assertEquals(5, g.maxLocals, "maxLocals must include slots referenced by LOAD")
+    }
+
+    @Test
+    fun `backward branch with extra local in body keeps header frame correct`() {
+        // Loop: header checks condition (ifeq exit), body defines an extra local
+        // and jumps back to header. The header frame should NOT include the
+        // body-only local, even though the back-edge has it defined.
+        val loopHeader = InstructionBlock()
+        loopHeader.add(Instruction.OneArgumentUByte(Opcode.ILoad, 0u))
+        val ifeq = Instruction.OneArgumentShort(Opcode.IfEqual, 0)
+        loopHeader.add(ifeq)
+
+        val loopBody = InstructionBlock()
+        loopBody.add(Instruction.OneArgumentUByte(Opcode.IConst0, 0u))
+        loopBody.add(Instruction.OneArgumentUByte(Opcode.IStore, 1u))
+        val goto = Instruction.OneArgumentShort(Opcode.Goto, 0)
+        loopBody.add(goto)
+        loopBody.jumpsTo(loopHeader)
+
+        val exit = InstructionBlock()
+        exit.add(Instruction.NoArgument(Opcode.Return))
+        loopHeader.jumpsTo(exit)
+
+        val main = InstructionBlock()
+        main.add(Instruction.OneArgumentUByte(Opcode.IConst0, 0u))
+        main.add(Instruction.OneArgumentUByte(Opcode.IStore, 0u))
+        val gotoMain = Instruction.OneArgumentShort(Opcode.Goto, 0)
+        main.add(gotoMain)
+        main.jumpsTo(loopHeader)
+
+        val g = generator(listOf(main, loopHeader, loopBody, exit), "()V", isStatic = true)
+        val entries = g.generate()
+        assertTrue(entries.isNotEmpty())
+
+        // StackMapTable entries (sorted by offset > 0): loopHeader, exit
+        // loopHeader entry should have locals=[Integer], NOT [Integer, Integer]
+        val headerEntry = entries.first()
+        assertEquals(VerificationType.Integer, headerEntry.frame.local(0))
+        assertEquals(
+            VerificationType.Top,
+            headerEntry.frame.local(1),
+            "local 1 must be Top at header: only defined inside loop body",
+        )
+    }
 }

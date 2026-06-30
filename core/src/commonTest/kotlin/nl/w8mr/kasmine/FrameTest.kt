@@ -102,7 +102,7 @@ class FrameTest {
     }
 
     @Test
-    fun `merge with larger frame extends locals`() {
+    fun `merge with larger frame extends locals and picks up merge of uninitialized slots`() {
         val f = Frame()
         f.setLocal(0, VerificationType.Integer)
         val g = Frame()
@@ -110,7 +110,20 @@ class FrameTest {
         assertTrue(f.merge(g))
         assertEquals(3, f.locals.size)
         assertEquals(VerificationType.Top, f.local(1))
-        assertEquals(VerificationType.Float, f.local(2))
+        // Merge of Top (from f's extension) with Float (from g) is Top per JVM spec
+        assertEquals(VerificationType.Top, f.local(2))
+    }
+
+    @Test
+    fun `merge with extra local that is not in the first frame keeps slot 1 as Top`() {
+        val f = Frame()
+        f.setLocal(0, VerificationType.Integer)
+        val g = Frame()
+        g.setLocal(0, VerificationType.Integer)
+        g.setLocal(1, VerificationType.Integer)
+        assertFalse(f.merge(g), "Top.merge(Integer) should stay Top, so no change")
+        assertEquals(VerificationType.Integer, f.local(0))
+        assertEquals(VerificationType.Top, f.local(1), "slot 1 should remain Top, not Integer")
     }
 
     @Test

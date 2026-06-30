@@ -52,8 +52,7 @@ sealed class VerificationType {
     fun merge(other: VerificationType): VerificationType =
         when {
             this == other -> this
-            this is Top -> other
-            other is Top -> this
+            this is Top || other is Top -> VerificationType.Top
             this is Object && other is Object ->
                 if (this.className == other.className) this else Object("java/lang/Object")
             this is Object && other is Null -> this

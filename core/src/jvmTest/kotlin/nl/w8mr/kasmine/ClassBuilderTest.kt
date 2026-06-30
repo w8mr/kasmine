@@ -597,26 +597,28 @@ class ClassBuilderTest {
 
     @Test
     fun `branch with String parameter generates valid StackMapTable`() {
-        val bytes = classBuilder {
-            access = 33u
-            name = "StringParamBranch"
-            method {
-                access = 9u
-                name = "run"
-                signature = "(Ljava/lang/String;)I"
-                parameter("x")
-                val end = label()
-                loadConstant(42)
-                loadConstant(0)
-                ifequal(end)
-                loadConstant(0)
-                ireturn()
-                end {
-                    loadConstant(1)
-                    ireturn()
+        val bytes =
+            classBuilder {
+                    access = 33u
+                    name = "StringParamBranch"
+                    method {
+                        access = 9u
+                        name = "run"
+                        signature = "(Ljava/lang/String;)I"
+                        parameter("x")
+                        val end = label()
+                        loadConstant(42)
+                        loadConstant(0)
+                        ifequal(end)
+                        loadConstant(0)
+                        ireturn()
+                        end {
+                            loadConstant(1)
+                            ireturn()
+                        }
+                    }
                 }
-            }
-        }.write()
+                .write()
         val loader = DynamicClassLoader(null)
         val clazz = loader.define("StringParamBranch", bytes)
         val method = clazz.getMethod("run", String::class.java)
@@ -748,5 +750,72 @@ class ClassBuilderTest {
         val clazz = loader.define("DoubleConst", bytes)
         val method = clazz.getMethod("run")
         assertEquals(0.0, method.invoke(null))
+    }
+
+    @Test
+    fun `label block without nextBlock appends subsequent instructions to outer block`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "NoNextBlock"
+            version = 52
+            method {
+                access = 9u
+                name = "run"
+                signature = "()I"
+                val skip = label()
+                loadConstant(0)
+                istore("x")
+                iload("x")
+                ifequal(skip)
+                loadConstant(1)
+                ireturn()
+                skip {}
+                nextBlock()
+                loadConstant(99)
+                ireturn()
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("NoNextBlock", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(99, method.invoke(null))
+    }
+
+    @Test
+    fun `backward branch with local defined only in loop body produces valid stack map`() {
+        val myClass = classBuilder {
+            access = 33u
+            name = "LoopBodyLocal"
+            version = 52
+            method {
+                access = 9u
+                name = "run"
+                signature = "()I"
+                val exit = label()
+                val loop = label()
+                loadConstant(0)
+                istore("x")
+                goto(loop)
+                loop {
+                    iload("x")
+                    ifnotequal(exit)
+                    loadConstant(99)
+                    istore("y")
+                    loadConstant(1)
+                    istore("x")
+                    goto(loop)
+                }
+                exit {
+                    loadConstant(42)
+                    ireturn()
+                }
+            }
+        }
+        val bytes = myClass.write()
+        val loader = DynamicClassLoader(null)
+        val clazz = loader.define("LoopBodyLocal", bytes)
+        val method = clazz.getMethod("run")
+        assertEquals(42, method.invoke(null))
     }
 }

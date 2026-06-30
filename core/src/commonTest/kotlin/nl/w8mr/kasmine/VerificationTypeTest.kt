@@ -151,13 +151,31 @@ class VerificationTypeTest {
     }
 
     @Test
-    fun `merge Top with X returns X`() {
-        assertEquals(VerificationType.Integer, VerificationType.Top.merge(VerificationType.Integer))
+    fun `merge Top with X returns Top`() {
+        assertEquals(VerificationType.Top, VerificationType.Top.merge(VerificationType.Integer))
     }
 
     @Test
-    fun `merge X with Top returns X`() {
-        assertEquals(VerificationType.Float, VerificationType.Float.merge(VerificationType.Top))
+    fun `merge X with Top returns Top`() {
+        assertEquals(VerificationType.Top, VerificationType.Float.merge(VerificationType.Top))
+    }
+
+    @Test
+    fun `merge Top with Object returns Top`() {
+        assertEquals(
+            VerificationType.Top,
+            VerificationType.Top.merge(VerificationType.Object("java/lang/String")),
+        )
+    }
+
+    @Test
+    fun `merge Null with Top returns Top`() {
+        assertEquals(VerificationType.Top, VerificationType.Null.merge(VerificationType.Top))
+    }
+
+    @Test
+    fun `merge Top with Top returns Top`() {
+        assertEquals(VerificationType.Top, VerificationType.Top.merge(VerificationType.Top))
     }
 
     @Test

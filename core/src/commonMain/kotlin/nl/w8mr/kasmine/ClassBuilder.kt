@@ -353,6 +353,11 @@ class ClassBuilder {
             val label: LabelProvider
                 get() = LabelProvider()
 
+            /**
+             * Creates a new instruction block for this label and runs [init] inside it. After the
+             * lambda the current block is restored to its previous value. Use [nextBlock] if you
+             * need to break the restore and start a fresh block.
+             */
             operator fun BlockRef.invoke(init: DSL.() -> Unit) {
                 val ib = InstructionBlock()
                 this.block = ib
@@ -364,6 +369,15 @@ class ClassBuilder {
                 this@DSL.init()
                 currentBlock = prevBlock
                 self = prevSelf
+            }
+
+            /**
+             * Ends the current block so the next instruction starts a fresh block. Use this after
+             * label blocks ([BlockRef.invoke]) when subsequent instructions should not be appended
+             * to the pre-label block.
+             */
+            fun nextBlock() {
+                currentBlock = null
             }
 
             fun block(init: DSL.() -> Unit): BlockRef {
